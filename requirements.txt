@@ -1,0 +1,13 @@
+react-router-dom 
+axios
+@tanstack/react-query
+zustand
+react-hook-form
+lightweight-charts
+react-icons
+framer-motion
+dayjs
+clsx
+tailwind-merge
+
+tailwindcss @tailwindcss/vite
