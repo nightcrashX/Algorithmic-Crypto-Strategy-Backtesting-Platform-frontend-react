@@ -14,7 +14,8 @@ export class IndicatorManager {
     this.paneIndexes = {};
     // ===== Change End =====
   }
-
+  
+  
   // ===== Change Start =====
   // Ye change isliye kiya kyuki indicator options me custom pane value aa rahi hai.
   // Lightweight Charts ko pane naam option ke andar nahi dena chahiye, warna series options dirty ho jate hain.
@@ -86,12 +87,111 @@ export class IndicatorManager {
   }
   // ===== Change End =====
 
+  // addSupertrend(name, data, options = {}) 
+  // {
+  //     console.log("🔥 addSupertrend called:", name);
+  //     console.log("🔥 Supertrend data:", data);
+  //     const bullName = `${name}-bull`;
+  //     const bearName = `${name}-bear`;
+  //     const bullData = [];
+  //     const bearData = [];
+  //     data.forEach((point) => {
+      
+  //         const trend = Number(point.trend);
+      
+  //         if (
+  //             point.value === null ||
+  //             point.value === undefined ||
+  //             point.value === 0
+  //         ) {
+  //             return;
+  //         }
+        
+  //         if (trend === 1) {
+          
+  //             bullData.push({
+  //                 time: point.time,
+  //                 value: point.value,
+  //             });
+            
+  //         } else if (trend === -1) {
+          
+  //             bearData.push({
+  //                 time: point.time,
+  //                 value: point.value,
+  //             });
+            
+  //         }
+        
+  //     });
+    
+  //     console.log("🟢 Bull data:", bullData);
+  //     console.log("🔴 Bear data:", bearData);
+    
+  //     // ==========================
+  //     // BULLISH SERIES
+  //     // ==========================
+    
+  //     if (!this.series[bullName]) {
+      
+  //         const bullSeries = this.engine.chart.addSeries(
+  //             LineSeries,
+  //             {
+  //                 ...this.getSeriesOptions(options),
+              
+  //                 color: "#22C55E",
+  //                 lineWidth: 2,
+              
+  //                 priceLineVisible: false,
+  //                 lastValueVisible: false,
+  //             },
+  //             this.getPaneIndex(options)
+  //         );
+        
+  //         this.series[bullName] = bullSeries;
+  //     }
+    
+  //     // ==========================
+  //     // BEARISH SERIES
+  //     // ==========================
+    
+  //     if (!this.series[bearName]) {
+      
+  //         const bearSeries = this.engine.chart.addSeries(
+  //             LineSeries,
+  //             {
+  //                 ...this.getSeriesOptions(options),
+              
+  //                 color: "#EF4444",
+  //                 lineWidth: 2,
+              
+  //                 priceLineVisible: false,
+  //                 lastValueVisible: false,
+  //             },
+  //             this.getPaneIndex(options)
+  //         );
+        
+  //         this.series[bearName] = bearSeries;
+  //     }
+    
+  //     // ==========================
+  //     // UPDATE
+  //     // ==========================
+    
+  //     this.series[bullName].setData(bullData);
+    
+  //     this.series[bearName].setData(bearData);
+    
+  // }
   addSingle(name, data, options = {}) {
     if (this.series[name]) {
       this.series[name].setData(data);
       return;
     }
 
+  
+
+  
     // ===== Change Start =====
     // Ye change isliye kiya kyuki EMA/SMA/VWAP main pane me aur RSI/MACD separate pane me jana chahiye.
     // Lightweight Charts v5 me addSeries ka third argument paneIndex hota hai, isi se real pane create hota hai.

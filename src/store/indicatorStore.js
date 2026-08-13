@@ -1,3 +1,5 @@
+// src/store/indicatorStore.js
+
 import { create } from "zustand";
 
 const useIndicatorStore = create((set) => ({
@@ -10,6 +12,13 @@ const useIndicatorStore = create((set) => ({
   addIndicator: (indicator) =>
     set((state) => ({
       indicators: [...state.indicators, indicator],
+    })),
+
+  updateIndicator: (id, updatedIndicator) =>
+    set((state) => ({
+      indicators: state.indicators.map((ind) =>
+        ind.id === id ? { ...ind, ...updatedIndicator } : ind
+      ),
     })),
 
   removeIndicator: (id) =>

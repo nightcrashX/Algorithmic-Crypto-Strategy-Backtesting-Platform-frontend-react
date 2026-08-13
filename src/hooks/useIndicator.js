@@ -8,6 +8,7 @@ export function useIndicatorRegistry() {
   const [registry, setRegistry] = useState({});
 
   useEffect(() => {
+    console.log("usereddfec");
     async function load() {
       const data = await fetchIndicatorRegistry();
       setRegistry(data);
@@ -25,6 +26,7 @@ export async function loadIndicator(
   timeframe,
   indicator
 ) {
+  //console.log("heelo");
   return await fetchIndicator({
     exchange,
     symbol,

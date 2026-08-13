@@ -10,6 +10,10 @@ import { loadIndicator } from "../../hooks/useIndicator";
 import useChartStore from "../../store/chartStore";
 
 import useIndicatorStore from "../../store/indicatorStore";
+import { setFeatureDefinitions } from "framer-motion";
+
+// import addsingle from "../../components/chart/IndicatorManager" ;
+// import addSupertrend from "../../components/chart/IndicatorManager"
 
 function ChartCanvas() {
 
@@ -30,7 +34,10 @@ function ChartCanvas() {
   const indicators = useIndicatorStore((s) => s.indicators);
   // ===== Change End =====
 
-  const { data } = useChart(
+  const {
+    data,
+    isLoading
+    } = useChart(
     exchange,
     symbol,
     timeframe
@@ -56,17 +63,21 @@ function ChartCanvas() {
 
   const getSeriesStyle = useCallback((indicator, outputKey = "") => {
 
+    //  Grab both style and settings safely
     const style = indicator.style || {};
+    const settings = indicator.settings || {};
 
     const key = outputKey.toUpperCase();
 
+    //  UPDATED COLOR RESOLUTION CHAIN
     const color =
       (key === "SIGNAL" && style.signalColor) ||
       (key === "MACD" && style.macdColor) ||
       (key.includes("K") && style.kColor) ||
       (key.includes("D") && style.dColor) ||
-      style.color ||
-      "#2962FF";
+      settings.color || // Check user setting overrides from the picker first!
+      style.color ||   //  Fall back to registry asset configurations
+      "#e9ebf1";        // Default fallback theme color
 
     return {
       color,
@@ -76,6 +87,7 @@ function ChartCanvas() {
     };
 
   }, []);
+
 
   const getHistogramData = useCallback((dataList, indicator) => {
 
@@ -128,6 +140,40 @@ function ChartCanvas() {
         return;
       }
 
+      // if (
+      //     indicator.type.toLowerCase() === "SUPERTREND" ||
+      //     outputKey.toLowerCase() === "supertrend"
+      // ) {
+      //     print("enter in supertrend")
+      //     console.log("supertrend enter")
+      //     engineRef.current.indicatorManager.addSupertrend(
+      //         seriesName,
+      //         outputData,
+      //         getSeriesStyle(indicator, outputKey)
+      //     );
+
+      //     return;
+      // }
+      // const indicatorType = String(indicator.type || "").toLowerCase();
+      // const outputType = String(outputKey || "").toLowerCase();
+
+      // const isSupertrend =
+      //     indicatorType.includes("supertrend") ||
+      //     outputType.includes("supertrend");
+
+      // if (isSupertrend) {
+
+      //     console.log("🔥 USING SUPERTREND RENDERER");
+
+      //     engineRef.current.indicatorManager.addSupertrend(
+      //         seriesName,
+      //         outputData,
+      //         getSeriesStyle(indicator, outputKey)
+      //     );
+        
+      //     return;
+      // }
+
       engineRef.current.indicatorManager.addSingle(
         seriesName,
         outputData,
@@ -138,7 +184,7 @@ function ChartCanvas() {
 
   }, [getHistogramData, getSeriesStyle]);
   // ===== Change End =====
-
+console.log("hello")
   useEffect(() => {
 
     if (!containerRef.current) return;
@@ -238,132 +284,110 @@ function ChartCanvas() {
   }, [indicators, exchange, symbol, timeframe, getIndicatorPayload, renderIndicatorPayload]);
   // ===== Change End =====
 
+  // new useffect for live chart using websockets
+
+  // ADD THIS HOOK TO STREAMS LIVE TICKER CANDLE TRANSFERS
+  // useEffect(() => {
+  //   if (!engineRef.current || !exchange || !symbol || !timeframe) return;
+
+  //   // Build matching WS protocol URI pointing directly to your local FastAPI service routing
+  //   const socketUrl = `ws://localhost:8000/indicator/ws/candles/${exchange}/${symbol}/${timeframe}`;
+  //   const ws = new WebSocket(socketUrl);
+
+  //   ws.onopen = () => {
+  //     console.log(`📡 WebSocket Connected live to ticker stream: ${symbol}`);
+  //   };
+
+  //   ws.onmessage = (event) => {
+  //     try {
+  //       const liveCandle = JSON.parse(event.data);
+        
+  //       if (!engineRef.current || !liveCandle) return;
+
+  //       // 1. Feed the live tick candle directly into your ChartEngine structure loop
+  //       // Lightweight Charts/TradingView engines natively expect single records inside update()
+  //       if (engineRef.current.updateData) {
+  //         engineRef.current.updateData(liveCandle);
+  //       } else if (engineRef.current.candleSeries) {
+  //         engineRef.current.candleSeries.update(liveCandle);
+  //       } else {
+  //         // If you have a custom canvas hook inside your engine:
+  //         engineRef.current.setData((prev) => {
+  //           const copy = [...prev];
+  //           const lastIdx = copy.length - 1;
+            
+  //           if (lastIdx >= 0 && copy[lastIdx].time === liveCandle.time) {
+  //             copy[lastIdx] = liveCandle; // Replace/update final forming active candle
+  //           } else {
+  //             copy.push(liveCandle); // Spawns a brand new candlestick node structural frame
+  //           }
+  //           return copy;
+  //         });
+  //       }
+
+  //       // 2. Format and pipe matching volumes alongside it
+  //       const volumeTick = {
+  //         time: liveCandle.time,
+  //         value: liveCandle.volume,
+  //         color: liveCandle.close >= liveCandle.open ? "#22C55E" : "#EF4444"
+  //       };
+        
+  //       if (engineRef.current.volumeSeries) {
+  //         engineRef.current.volumeSeries.update(volumeTick);
+  //       }
+
+  //     } catch (err) {
+  //       console.error("Error reading incoming stream data framework socket packet:", err);
+  //     }
+  //   };
+
+  //   ws.onerror = (error) => {
+  //     console.error("WebSocket network error occurred:", error);
+  //   };
+
+  //   ws.onclose = () => {
+  //     console.log("📡 WebSocket disconnected safely from server.");
+  //   };
+
+  //   // Clean up current running connection streams when market selectors swap indices
+  //   return () => {
+  //     ws.close();
+  //   };
+  // }, [exchange, symbol, timeframe]);
+
   return (
 
-    <div
-      ref={containerRef}
-      className="flex-1"
-    />
+    <div className="relative flex-1">
+
+        <div
+            ref={containerRef}
+            className="h-full"
+        />
+
+        {isLoading && (
+
+            <div className="absolute inset-0 bg-[#0D1117]/60 backdrop-blur-sm flex items-center justify-center z-50">
+
+                <div className="flex flex-col items-center gap-3">
+
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"/>
+
+                    <p className="text-gray-300 text-sm">
+
+                        Loading Chart...
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        )}
+
+    </div>
 
   );
 
 }
 
 export default ChartCanvas;
-
-
-// import { useCallback, useEffect, useRef } from "react";
-// import {
-//   createChart,
-//   CandlestickSeries,
-// } from "lightweight-charts";
-
-// import { useChart } from "../../hooks/useChart";
-// import useChartStore from "../../store/chartStore";
-
-// function ChartCanvas() {
-
-//   const chartContainerRef = useRef(null);
-//   const chartRef = useRef(null);
-//   const candleSeriesRef = useRef(null);
-
-//   const exchange = useChartStore((state) => state.exchange);
-//   const symbol = useChartStore((state) => state.symbol);
-//   const timeframe = useChartStore((state) => state.timeframe);
-
-//   const { data } = useChart(
-//     exchange,
-//     symbol,
-//     timeframe
-//   );
-
-//   /* ---------------- CREATE CHART ---------------- */
-
-//   useEffect(() => {
-
-//     if (!chartContainerRef.current) return;
-
-//     chartRef.current = createChart(chartContainerRef.current, {
-
-//       layout: {
-
-//         background: {
-//           color: "#0D1117",
-//         },
-
-//         textColor: "#9CA3AF",
-
-//       },
-
-//       grid: {
-
-//         vertLines: {
-//           color: "#1F2937",
-//         },
-
-//         horzLines: {
-//           color: "#1F2937",
-//         },
-
-//       },
-
-//       crosshair: {
-
-//         mode: 1,
-
-//       },
-
-//       rightPriceScale: {
-
-//         borderColor: "#2A2E39",
-
-//       },
-
-//       timeScale: {
-
-//         borderColor: "#2A2E39",
-
-//       },
-
-//       autoSize: true,
-
-//     });
-
-//     candleSeriesRef.current =
-//       chartRef.current.addSeries(
-//         CandlestickSeries
-//       );
-
-//     return () => {
-
-//       chartRef.current.remove();
-
-//     };
-
-//   }, []);
-
-//   /* ---------------- UPDATE DATA ---------------- */
-
-//   useEffect(() => {
-
-//     if (!candleSeriesRef.current) return;
-
-//     candleSeriesRef.current.setData(data);
-
-//   }, [data]);
-
-//   return (
-
-//     <div
-//       ref={chartContainerRef}
-//       className="flex-1"
-//     />
-
-//   );
-
-// }
-
-// export default ChartCanvas;
-
-
-

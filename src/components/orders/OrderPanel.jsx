@@ -6,10 +6,14 @@ function OrderPanel() {
 
         <h2 className="text-white font-semibold">
           Order Panel
-        </h2>
+        </h2>      
 
       </div>
 
+      <div className="border-b" >
+        <h2 className="text-white font-semibold border-b">Buy</h2>
+        <h2 className="text-white font-semibold">Sell</h2>
+      </div>
     </div>
   );
 }

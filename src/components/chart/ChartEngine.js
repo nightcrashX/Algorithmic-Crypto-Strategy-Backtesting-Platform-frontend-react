@@ -148,7 +148,9 @@ export class ChartEngine {
 
 
   updateCandle(candle) {
-    this.candleSeries.update(candle);
+    // this.candleSeries.update(candle);
+    this.mainSeries.update(candle);
+    
   }
 
   // addVolume(data) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { ChartSync } from "../ChartSync";
+// import { ChartSync } from "../ChartSync";
 import ChartHeader from "../ChartHeader";
-import PriceChart from "./PriceChart";
+// import PriceChart from "./PriceChart";
 // import VolumeChart from "./VolumeChart";
 import ChartCanvas from "../ChartCanvas";
 
@@ -13,12 +13,15 @@ function TradingChart() {
       <ChartHeader/>
   
         <div className="flex-1 flex flex-col">
+          
+          {/* <PriceChart /> */}
+          <ChartCanvas />
   
-          <div className="">
+          {/* <div className="">
   
               <PriceChart />
   
-          </div>
+          </div> */}
   
           {/* <div className="border-t border-[#2A2E39]">
   
