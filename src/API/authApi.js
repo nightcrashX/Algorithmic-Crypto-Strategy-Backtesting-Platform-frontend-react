@@ -12,6 +12,6 @@ export const profileApi = () => {
   return api.get("/user/profile");
 };
 
-// export const logoutApi = () => {
-//   return api.post("/user/logout");
-// };
+export const logoutApi = () => {
+  return api.delete("/user/logout",{withCredentials:true,});
+};

@@ -1,182 +1,109 @@
-import { div } from "framer-motion/client";
+import { CandlestickChart, LockKeyhole, Mail, Phone, User } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../services/authService";
-import useAuthStore from "../store/authStore";
 
 function Register() {
   const navigate = useNavigate();
-
-  const checkAuth = useAuthStore((state) => state.checkAuth);
-
   const [formData, setFormData] = useState({
-    name:"",
-    username:"",
-    contact:"",
+    name: "",
+    username: "",
+    contact: "",
     email: "",
     password: "",
   });
-
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+  const handleChange = (event) => {
+    setFormData((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
-      setLoading(true);
-
       await registerUser(formData);
-
-      await checkAuth();
-
       navigate("/login", { replace: true });
-
-    } catch (error) {
-      alert("Invalid Email or Password");
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError("Unable to create account. Review  details and try again.");
     } finally {
       setLoading(false);
     }
   };
-  return (
-    <div className="relative flex min-h-screen items-center justify-center bg-zinc-950 overflow-hidden">
-      
-      {/* Background Glowing Orbs for Aesthetic Vibe */}
-      <div className="absolute top-1/4 left-1/4 h-72 w-72 /rounded-full bg-blue-600/20 /blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 h-72 w-72 /rounded-full bg-indigo-600/20 /blur-[100px] pointer-events-none"></div>
 
-      {/* Glassmorphism Login Card */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl sm:p-10">
-        
-        <div className="text-center">
-          <h2 className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-            Welcome Back
-          </h2>
-          <p className="mt-2 text-sm text-gray-400">
-            Please enter your details to Register Yourself.
-          </p>
+  const fields = [
+    { label: "Full name", name: "name", type: "text", icon: User, placeholder: "Priya Sharma" },
+    { label: "Username", name: "username", type: "text", icon: User, placeholder: "priya_trades" },
+    { label: "Contact", name: "contact", type: "tel", icon: Phone, placeholder: "99********" },
+    { label: "Email", name: "email", type: "email", icon: Mail, placeholder: "you@example.com" },
+    { label: "Password", name: "password", type: "password", icon: LockKeyhole, placeholder: "••••••••" },
+  ];
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#070a0f] p-5 text-slate-200">
+      <div className="w-full max-w-[500px]">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-md border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
+            <CandlestickChart size={22} />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-white">Create trading account</h1>
+            <p className="text-sm text-slate-500">Set up  strategy workspace.</p>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} method="POST" className="mt-8 space-y-6">
-          {/* name */}
-          <div className="">
-            <div className="grid grid-cols-2 gap-4">
-            <div className="mt-2 ">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 ">
-              Name
-            </label>
-              <input
-                id="name"
-                type="name"
-                name="name"
-                placeholder="Full Name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className=" mt-2 block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-indigo-500 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
+        <div className="terminal-panel rounded-lg p-6 shadow-2xl shadow-black/30">
+          {error && (
+            <div className="mb-4 rounded-md border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-200">
+              {error}
             </div>
-            <div className="mt-2 ">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-              UserName
-              </label>
-              <input
-                id="username"
-                type="username"
-                name="username"
-                placeholder="UserName"
-                value={formData.username}
-                onChange={handleChange}
-                required
-                className=" mt-2 block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-indigo-500 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
-            </div>
-            </div>
+          )}
 
-            <div>
-            <label htmlFor="email" className="mt-4 block text-sm font-medium text-gray-300">
-              Contact
-            </label>
-            <div className="mt-2">
-              <input
-                id="contact"
-                type="contact"
-                name="contact"
-                placeholder="99********"
-                value={formData.contact}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-indigo-500 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
-            </div>
-          </div>
-          </div>
+          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+            {fields.map((field) => {
+              const Icon = field.icon;
+              return (
+                <label
+                  key={field.name}
+                  className={`block text-sm text-slate-300 ${field.name === "password" ? "sm:col-span-2" : ""}`}
+                >
+                  {field.label}
+                  <span className="mt-2 flex items-center gap-2 terminal-input px-3">
+                    <Icon size={16} className="text-slate-500" />
+                    <input
+                      type={field.type}
+                      name={field.name}
+                      value={formData[field.name]}
+                      onChange={handleChange}
+                      required
+                      placeholder={field.placeholder}
+                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-600"
+                    />
+                  </span>
+                </label>
+              );
+            })}
 
-          {/* Email Input */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-              Email
-            </label>
-            <div className="mt-2">
-              <input
-                id="email"
-                type="email"
-                name="email"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-indigo-500 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
-            </div>
-          </div>
-
-          {/* Password Input */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-              Password
-            </label>
-            <div className="mt-2">
-              <input
-                id="password"
-                type="password"
-                name="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-indigo-500 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-6 flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-indigo-500/30 active:scale-95 disabled:pointer-events-none disabled:opacity-70"
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                {/* Simple loading spinner */}
-                <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Logging In...
-              </span>
-            ) : (
-              "Register"
-            )}
-          </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-10 rounded-md bg-cyan-400 text-sm font-semibold text-[#041014] transition hover:bg-cyan-300 disabled:opacity-60 sm:col-span-2"
+            >
+              {loading ? "Creating account..." : "Create account"}
+            </button>
           </form>
+
+          <p className="mt-5 text-center text-sm text-slate-500">
+            Already have access?{" "}
+            <Link to="/login" className="font-medium text-cyan-300 hover:text-cyan-200">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

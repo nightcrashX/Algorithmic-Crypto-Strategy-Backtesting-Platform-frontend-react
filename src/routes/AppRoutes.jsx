@@ -5,7 +5,7 @@ import Register from "../pages/Register";
 
 import Dashboard from "../pages/Dashboard";
 import Strategy from "../pages/Strategy";
-import Portfolio from "../pages/Portfolio";
+import Market from "../pages/Market";
 import Backtesting from "../pages/Backtesting";
 import Settings from "../pages/Settings";
 
@@ -33,11 +33,15 @@ function AppRoutes() {
                            <DashboardLayout />
                         </ProtectedRoute>}>
 
+          <Route path="/markets" element={<Market />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          
+          <Route path="/watchlist" element={<Market />} />
+          <Route path="/indicators" element={<Strategy />} />
 
           <Route path="/strategy" element={<Strategy />} />
 
-          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/Market" element={<Market />} />
 
           <Route path="/backtesting" element={<Backtesting />} />
 

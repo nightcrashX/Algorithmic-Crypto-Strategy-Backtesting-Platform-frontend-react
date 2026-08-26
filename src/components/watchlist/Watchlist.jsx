@@ -1,146 +1,50 @@
 import { Search, Star } from "lucide-react";
+import useChartStore from "../../store/chartStore";
+import { marketRows } from "../../utils/marketData";
 
-const watchlist = [
-  {
-    symbol: "BTC/USDT",
-    price: "118,245.10",
-    change: "+2.48%",
-    positive: true,
-  },
-  {
-    symbol: "ETH/USDT",
-    price: "4,385.90",
-    change: "+1.16%",
-    positive: true,
-  },
-  {
-    symbol: "SOL/USDT",
-    price: "205.81",
-    change: "-3.24%",
-    positive: false,
-  },
-  {
-    symbol: "BNB/USDT",
-    price: "812.12",
-    change: "+0.84%",
-    positive: true,
-  },
-  {
-    symbol: "XRP/USDT",
-    price: "2.81",
-    change: "-1.52%",
-    positive: false,
-  },
-];
+function Watchlist({ compact = false }) {
+  const setSymbol = useChartStore((state) => state.setSymbol);
 
-function Watchlist() {
   return (
-    <aside className="w-[280px] bg-[#131722] border-r border-[#2A2E39] flex flex-col">
-
-      {/* Header */}
-
-      <div className="px-4 py-4 border-b border-[#2A2E39]">
-
-        <h2 className="text-white font-semibold text-lg">
-          Watchlist
-        </h2>
-
-      </div>
-
-      {/* Search */}
-
-      <div className="p-4">
-
-        <div className="flex items-center gap-2 rounded-lg bg-[#1C2330] px-3 py-2">
-
-          <Search
-            size={16}
-            className="text-gray-400"
-          />
-
-          <input
-            placeholder="Search Symbol..."
-            className="
-              w-full
-              bg-transparent
-              outline-none
-              text-white
-              placeholder:text-gray-500
-              text-sm
-            "
-          />
-
+    <aside className=" terminal-panel flex min-h-0 flex-col rounded-lg lg:rounded-none lg:border-y-0 lg:border-l-0">
+      <div className="flex items-center justify-between border-b border-[#202938] px-3 py-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Watchlist</h2>
+          <p className="text-xs text-slate-500">Favorites and movers</p>
         </div>
-
+        <button type="button" title="Add symbol" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-[#151d29] hover:text-yellow-300">
+          <Star size={16} />
+        </button>
       </div>
 
-      {/* Symbols */}
+      {!compact && (
+        <div className="p-3">
+          <label className="flex items-center gap-2 terminal-input px-3">
+            <Search size={15} className="text-slate-500" />
+            <input placeholder="Search symbol" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-600" />
+          </label>
+        </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto">
-
-        {watchlist.map((item) => (
-
+      <div className="min-h-0 flex-1 overflow-auto">
+        {marketRows.map((item) => (
           <button
             key={item.symbol}
-            className="
-              w-full
-              flex
-              items-center
-              justify-between
-              px-4
-              py-3
-              border-b
-              border-[#1f2632]
-              hover:bg-[#1C2330]
-              transition
-            "
+            type="button"
+            onClick={() => setSymbol(item.symbol)}
+            className="grid w-full grid-cols-[1fr_auto] gap-3 border-t border-[#141c28] px-3 py-2.5 text-left transition hover:bg-[#121a25]"
           >
-
-            <div className="flex items-center gap-3">
-
-              <Star
-                size={15}
-                className="text-gray-500 hover:text-yellow-400"
-              />
-
-              <div>
-
-                <p className="text-white text-sm font-medium">
-                  {item.symbol}
-                </p>
-
-                <p className="text-xs text-gray-500">
-                  Crypto
-                </p>
-
-              </div>
-
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-100">{item.symbol}</p>
+              <p className="text-xs text-slate-600">Spot</p>
             </div>
-
             <div className="text-right">
-
-              <p className="text-white text-sm">
-                {item.price}
-              </p>
-
-              <p
-                className={`text-xs ${
-                  item.positive
-                    ? "text-green-500"
-                    : "text-red-500"
-                }`}
-              >
-                {item.change}
-              </p>
-
+              <p className="num text-sm text-slate-100">{item.price}</p>
+              <p className={`num text-xs ${item.positive ? "text-emerald-300" : "text-red-300"}`}>{item.change}</p>
             </div>
-
           </button>
-
         ))}
-
       </div>
-
     </aside>
   );
 }

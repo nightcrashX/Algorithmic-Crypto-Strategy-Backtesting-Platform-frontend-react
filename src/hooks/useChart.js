@@ -67,11 +67,9 @@ export function useChart(
   }, [exchange, symbol, timeframe]);
 
   return {
-
     data,
-
     loading,
-
+    isLoading: loading,
   };
 
 }

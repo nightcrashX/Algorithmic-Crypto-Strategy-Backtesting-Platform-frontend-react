@@ -16,3 +16,29 @@ Note: This will impact Vite dev & build performances.
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+
+
+## for install required library 
+
+npm install react-router-dom 
+npm install axios
+npm install @tanstack/react-query
+npm install zustand
+npm install react-hook-form
+npm install lightweight-charts
+npm install react-icons
+npm install framer-motion
+npm install dayjs
+npm install clsx
+npm install tailwind-merge
+npm install tailwindcss @tailwindcss/vite
+
+
+
+## For run 
+
+cmd :
+1 - npm install 
+2 - npm run dev
+

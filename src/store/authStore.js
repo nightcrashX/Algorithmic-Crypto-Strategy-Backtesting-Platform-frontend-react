@@ -15,7 +15,7 @@ const useAuthStore = create((set) => ({
         isAuthenticated: true,
         loading: false,
       });
-    } catch (error) {
+    } catch {
       set({
         user: null,
         isAuthenticated: false,

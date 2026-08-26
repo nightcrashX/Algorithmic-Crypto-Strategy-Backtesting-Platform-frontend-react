@@ -29,39 +29,42 @@ export function useMarkets() {
 
     async function load() {
 
-      const exchanges =
-        await fetchExchanges();
-    
-        console.log("exchanges in usemarket", exchanges)
-      setExchanges(exchanges);
+      try {
+        const exchanges = await fetchExchanges();
+        setExchanges(Array.isArray(exchanges) ? exchanges : []);
+      } catch (error) {
+        console.error("Failed to load exchanges:", error);
+      }
 
     }
 
     load();
 
-  }, []);
+  }, [setExchanges]);
 
   useEffect(() => {
 
+    if (!exchange) return;
+
     async function loadSymbols() {
 
-    //   const symbols =
-    //     await fetchSymbols(exchange);
+      try {
+        const response = await fetchSymbols(exchange);
+        const nextSymbols = Array.isArray(response) ? response : response?.symbols || [];
 
-    //   setSymbols(symbols);
-        const symbols = await fetchSymbols(exchange);
-        
-        console.log("symbols",symbols)
-        setSymbols(symbols.symbols);
-        setSymbol(symbols.symbols[0]);
+        setSymbols(nextSymbols);
 
-      if (symbols.length)
-        setSymbol(symbols[0]);
+        if (nextSymbols.length) {
+          setSymbol(nextSymbols[0]);
+        }
+      } catch (error) {
+        console.error("Failed to load symbols:", error);
+      }
 
     }
 
     loadSymbols();
 
-  }, [exchange]);
+  }, [exchange, setSymbol, setSymbols]);
 
 }

@@ -1,141 +1,120 @@
-import React, { useState } from 'react';
-import useIndicatorStore from '../../store/indicatorStore';
-import { updateIndicatorConfig } from '../../services/indicatorService';
+import { X } from "lucide-react";
+import { useState } from "react";
+import { updateIndicatorConfig } from "../../services/indicatorService";
+import useIndicatorStore from "../../store/indicatorStore";
 
 const IndicatorMenu = ({ indicator, currentMarket, onClose }) => {
-  // 1. Store numeric/text settings from the indicator
   const [settings, setSettings] = useState(indicator.settings || {});
-  
-  // 2. NEW: Dedicated state for tracking the indicator line color
-  // Checks indicator.style.color or indicator.settings.color first, falls back to blue
   const [lineColor, setLineColor] = useState(
-    indicator.style?.color || indicator.settings?.color || '#e3e6ec'
+    indicator.style?.color || indicator.settings?.color || "#22d3ee"
   );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const handleInputChange = (key, value) => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      [key]: typeof value === 'string' && !isNaN(value) && value !== '' ? Number(value) : value
+      [key]: typeof value === "string" && !Number.isNaN(Number(value)) && value !== "" ? Number(value) : value,
     }));
   };
 
-    const handleSubmit = async (e) => {
-      e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
 
-      const allCurrentIndicators = useIndicatorStore.getState().indicators;
+    const allCurrentIndicators = useIndicatorStore.getState().indicators;
+    const mathSettings = { ...settings };
+    delete mathSettings.color;
+    const formattedIndicatorsList = allCurrentIndicators.map((ind) => ({
+      id: ind.id,
+      type: ind.type,
+      settings: ind.id === indicator.id ? mathSettings : ind.settings || {},
+    }));
 
-      // 1. Separate math inputs from UI styles so the backend doesn't crash!
-      // This keeps keys like 'period' inside mathSettings, and ignores 'color'
-      const { color: dummy, ...mathSettings } = settings; 
-
-      const formattedIndicatorsList = allCurrentIndicators.map((ind) => {
-        if (ind.id === indicator.id) {
-          return {
-            id: ind.id,
-            type: ind.type,
-            settings: mathSettings // Send ONLY math parameters (like period) to FastAPI
-          };
-        }
-        return {
-          id: ind.id,
-          type: ind.type,
-          settings: ind.settings || {}
-        };
+    try {
+      const responseData = await updateIndicatorConfig({
+        exchange: currentMarket.exchange,
+        symbol: currentMarket.symbol,
+        timeframe: currentMarket.timeframe,
+        indicators: formattedIndicatorsList,
       });
 
-      const body = {
-        exchange: currentMarket.exchange,     
-        symbol: currentMarket.symbol,         
-        timeframe: currentMarket.timeframe,   
-        indicators: formattedIndicatorsList   
-      };
+      const serverMatch = Array.isArray(responseData)
+        ? responseData.find((item) => item.id === indicator.id) || {}
+        : responseData || {};
 
-      try {
-        const responseData = await updateIndicatorConfig(body);
-
-        let dynamicServerMatch = null;
-        if (Array.isArray(responseData)) {
-          dynamicServerMatch = responseData.find(item => item.id === indicator.id) || responseData;
-        } else {
-          dynamicServerMatch = responseData;
-        }
-
-        if (dynamicServerMatch) {
-          //    Save to Zustand, putting the color into BOTH locations safely
-          useIndicatorStore.getState().updateIndicator(indicator.id, {
-            ...dynamicServerMatch,
-            id: indicator.id, 
-            settings: {
-              ...mathSettings,
-              color: lineColor // Save here so settings panel remembers it next time
-            },
-            style: {
-              ...indicator.style,
-              color: lineColor // Save here so ChartCanvas.jsx reads it to draw the line
-            }
-          });
-        }
-
-        onClose();
-      } catch (error) {
-        console.error("Layout setting dispatch sequence failure:", error);
-      }
-    };
+      useIndicatorStore.getState().updateIndicator(indicator.id, {
+        ...serverMatch,
+        id: indicator.id,
+        settings: { ...mathSettings, color: lineColor },
+        style: { ...indicator.style, color: lineColor },
+      });
+      onClose();
+    } catch (err) {
+      console.error("Indicator settings update failed:", err);
+      setError("Settings could not be applied. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="settings-modal-overlay" style={{
-      position: 'absolute', top: '20%', left: '35%', backgroundColor: '#1e222d', 
-      color: '#fff', padding: '20px', borderRadius: '8px', zIndex: 999, border: '1px solid #363c4e'
-    }}>
-      <h3>Modify {indicator.type} Settings</h3>
-      <form onSubmit={handleSubmit}>
-        
-        {/* Render all structural numerical parameters like period, source, etc. */}
-        {Object.keys(settings).map((key) => {
-          // Skip drawing color here if it accidentally exists in settings to avoid double input fields
-          if (key === 'color') return null; 
-
-          return (
-            <div key={key} style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'center' }}>
-              <label style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}:</label>
-              {typeof settings[key] === 'number' ? (
-                <input 
-                  type="number" 
-                  value={settings[key]} 
-                  onChange={(e) => handleInputChange(key, e.target.value)}
-                  style={{ backgroundColor: '#2a2e39', color: '#fff', border: '1px solid #434651', borderRadius: '4px', padding: '4px', width: '80px' }}
-                />
-              ) : (
-                <input 
-                  type="text" 
-                  value={settings[key]} 
-                  onChange={(e) => handleInputChange(key, e.target.value)}
-                  style={{ backgroundColor: '#2a2e39', color: '#fff', border: '1px solid #434651', borderRadius: '4px', padding: '4px', width: '80px' }}
-                />
-              )}
-            </div>
-          );
-        })}
-
-        {/*   NEW: Permanent Dedicated Color Picker Form Field */}
-        <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'center' }}>
-          <label>Line Color:</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input 
-              type="color" 
-              value={lineColor} 
-              onChange={(e) => setLineColor(e.target.value)}
-              style={{ backgroundColor: 'transparent', border: 'none', width: '40px', height: '30px', cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: '12px', color: '#aaa', fontFamily: 'monospace' }}>{lineColor.toUpperCase()}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+      {/* UI CHANGE: Improved indicator settings modal spacing, focus states, and action hierarchy. */}
+      <div className="w-full max-w-[420px] rounded-lg border border-[#263142] bg-[#0b1017] shadow-2xl shadow-black/50">
+        <div className="flex items-center justify-between border-b border-[#202938] px-4 py-3">
+          <div>
+            <h3 className="font-semibold text-white">{indicator.type} Settings</h3>
+            <p className="text-xs text-slate-500">Dynamic configuration</p>
           </div>
+          <button type="button" onClick={onClose} title="Close settings" aria-label="Close indicator settings" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-[#151d29] hover:text-white">
+            <X size={16} />
+          </button>
         </div>
-        
-        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          <button type="button" onClick={onClose} style={{ background: 'none', color: '#aaa', border: 'none', cursor: 'pointer' }}>Cancel</button>
-          <button type="submit" style={{ backgroundColor: '#2962ff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Apply Settings</button>
-        </div>
-      </form>
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-4">
+          {error && (
+            <div className="rounded-md border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          )}
+
+          {Object.keys(settings).filter((key) => key !== "color").map((key) => (
+            <label key={key} className="flex items-center justify-between gap-4 text-sm text-slate-300">
+              <span className="capitalize">{key.replace("_", " ")}</span>
+              <input
+                type={typeof settings[key] === "number" ? "number" : "text"}
+                value={settings[key]}
+                onChange={(event) => handleInputChange(key, event.target.value)}
+                className="terminal-input h-9 w-32 px-2 text-right num"
+              />
+            </label>
+          ))}
+
+          <label className="flex items-center justify-between gap-4 text-sm text-slate-300">
+            <span>Line color</span>
+            <span className="flex items-center gap-2">
+              <input
+                type="color"
+                value={lineColor}
+                onChange={(event) => setLineColor(event.target.value)}
+                className="h-8 w-10 rounded border border-[#263142] bg-transparent"
+              />
+              <span className="num w-20 text-xs text-slate-500">{lineColor.toUpperCase()}</span>
+            </span>
+          </label>
+
+          <div className="flex justify-end gap-2 border-t border-[#202938] pt-4">
+            <button type="button" onClick={onClose} className="h-9 rounded-md px-3 text-sm text-slate-400 hover:bg-[#151d29] hover:text-white">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="h-9 rounded-md bg-cyan-400 px-4 text-sm font-semibold text-[#041014] hover:bg-cyan-300 disabled:opacity-60">
+              {saving ? "Applying..." : "Apply"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

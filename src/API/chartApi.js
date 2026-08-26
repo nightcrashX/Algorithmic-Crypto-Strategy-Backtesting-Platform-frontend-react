@@ -1,3 +1,4 @@
+//chartAPI.js
 import api from "./client";
 
 export const getExchanges = () =>

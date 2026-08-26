@@ -1,358 +1,82 @@
-import {
-  Search,
-  Bell,
-  Moon,
-  ChevronDown,
-  CandlestickChart,
-  ChartNoAxesCombined,
-} from "lucide-react";
+import { Bell, Menu, Search, ShieldCheck, Wifi,LogOut } from "lucide-react";
+import useChartStore from "../../store/chartStore";
+import { logoutUser } from "../../services/authService";
+import { useNavigate } from "react-router-dom";
 
-const timeframes = ["1m", "5m", "15m", "1H", "4H", "1D"];
-
-function Navbar() {
+function Navbar({ onMobileMenu }) {
+  const symbol = useChartStore((state) => state.symbol);
+  const timeframe = useChartStore((state) => state.timeframe);
+  
+  const navigate = useNavigate();
+  const handleLogout = async () => {
+    try{
+      await logoutUser();
+      navigate("/login", {replace:true});
+    }
+    catch (error) {
+      console.error("logout failed : ",error)
+    }
+  }
+  
   return (
-    <header className="h-14 bg-[#131722] border-b border-[#2A2E39] px-5 flex items-center justify-between">
-
-      {/* ---------- Left ---------- */}
-
-      <div className="flex items-center gap-8">
-
-        {/* Logo */}
-
-        <div className="flex items-center gap-5 cursor-pointer">
-
-          <CandlestickChart
-            size={24}
-            className="text-blue-500"
-          />
-
-          <h1 className="text-white text-lg font-semibold tracking-wide gap-">
-            AlgoTrade
-          </h1>
-          
-
+    // UI CHANGE: Refined compact terminal header with clearer market and status hierarchy.
+    <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-[#1b2533] bg-[#090e15]/95 px-3 shadow-[0_1px_0_rgba(255,255,255,0.03)] backdrop-blur md:px-5">
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={onMobileMenu}
+          className="grid h-9 w-9 place-items-center rounded-md text-slate-400 transition hover:bg-[#151d29] hover:text-white lg:hidden"
+          title="Open navigation"
+        >
+          <Menu size={20} />
+        </button>
+        <div className="hidden items-center gap-2 rounded-md border border-[#263142] bg-[#0a0f16] px-3 py-2 text-sm text-slate-400 shadow-inner sm:flex">
+          <Search size={16} />
+          <span className="min-w-[180px] text-slate-500">Search markets, indicators...</span>
         </div>
-
-        <h2 className="
-          flex
-          items-center
-          gap-4
-          rounded-lg
-          px-3
-          py-2
-          text-sm
-          text-white
-          hover:border-blue-500
-          transition
-          font-semibold">About</h2>
-
-        <h2 className="
-          flex
-          items-center
-          gap-4
-          rounded-lg
-          px-3
-          py-2
-          text-sm
-          text-white
-          hover:border-blue-500
-          transition
-          font-semibold">Backtesting</h2>
-
-        
-        {/* Exchange */}
-
-        {/* <button
-          className="
-          flex
-          items-center
-          gap-2
-          rounded-lg
-          border
-          border-[#2A2E39]
-          bg-[#1C2330]
-          px-3
-          py-2
-          text-sm
-          text-white
-          hover:border-blue-500
-          transition"
-        >
-
-          Binance
-
-          <ChevronDown size={16} />
-
-        </button>
-
-        {/* Symbol */}
-
-        {/* <button
-          className="
-          flex
-          items-center
-          gap-2
-          rounded-lg
-          border
-          border-[#2A2E39]
-          bg-[#1C2330]
-          px-3
-          py-2
-          text-sm
-          font-semibold
-          text-green-400
-          hover:border-blue-500
-          transition"
-        >
-
-          BTC / USDT
-
-          <ChevronDown size={16} />
-
-        </button>  */}
-
+        <div className="min-w-0 rounded-md border border-[#202938] bg-[#0a0f16] px-3 py-1.5 sm:hidden">
+          <p className="truncate text-sm font-semibold text-white">{symbol}</p>
+          <p className="text-xs text-slate-500">{timeframe}</p>
+        </div>
       </div>
 
-      {/* ---------- Center ---------- */}
-
-      {/* <div className="flex items-center gap-1">
-
-        {timeframes.map((item) => (
-
-          <button
-            key={item}
-            className={`
-            rounded-md
-            px-3
-            py-1.5
-            text-sm
-            transition-all
-
-            ${
-              item === "15m"
-                ? "bg-blue-600 text-white"
-                : "text-gray-400 hover:bg-[#1C2330] hover:text-white"
-            }
-          `}
-          >
-
-            {item}
-
-          </button>
-
-        ))}
-
-      </div> */}
-
-      {/* ---------- Right ---------- */}
-
-      <div className="flex items-center gap-3">
-
-        {/* Indicators */}
-
-        {/* <button
-          className="
-          flex
-          items-center
-          gap-2
-          rounded-lg
-          bg-[#1C2330]
-          px-3
-          py-2
-          text-sm
-          text-gray-300
-          hover:text-white"
-        >
-
-          <ChartNoAxesCombined size={17} />
-
-          Indicators
-
-        </button> */}
-
-        {/* Search */}
-
+      <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-300 md:flex">
+          <Wifi size={14} aria-hidden="true" />
+          Connected
+        </div>
+        <div className="hidden items-center gap-2 rounded-md border border-[#263142] bg-[#0a0f16] px-3 py-1.5 text-xs text-slate-400 md:flex">
+          <ShieldCheck size={14} className="text-cyan-300" />
+          Paper mode
+        </div>
         <button
-          className="
-          rounded-lg
-          p-2
-          text-gray-400
-          hover:bg-[#1C2330]
-          hover:text-white"
+          type="button"
+          title="Notifications"
+          className="relative grid h-9 w-9 place-items-center rounded-md text-slate-400 transition hover:bg-[#151d29] hover:text-white"
         >
-
-          <Search size={18} />
-
-        </button>
-
-        {/* Notification */}
-
-        <button
-          className="
-          rounded-lg
-          p-2
-          text-gray-400
-          hover:bg-[#1C2330]
-          hover:text-white"
-        >
-
           <Bell size={18} />
-
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-cyan-300" />
         </button>
 
-        {/* Theme */}
-
         <button
-          className="
-          rounded-lg
-          p-2
-          text-gray-400
-          hover:bg-[#1C2330]
-          hover:text-white"
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-md bg-cyan-400 text-sm font-bold text-[#041014]"
+          title="Profile"
         >
-
-          <Moon size={18} />
-
-        </button>
-
-        {/* Profile */}
-
-        <button
-          className="
-          h-10
-          w-10
-          rounded-full
-          bg-blue-600
-          text-white
-          flex
-          items-center
-          justify-center
-          font-semibold"
-        >
-
           P
-
         </button>
-
+        <button
+          type="button"
+          title="Logout"
+          onClick={handleLogout}
+          className="relative grid h-9 w-9 place-items-center rounded-md text-slate-400 transition hover:bg-[#151d29] hover:text-white"
+        >
+          <LogOut size={18} />
+          {/* <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-cyan-300" /> */}
+        </button>
       </div>
-
     </header>
   );
 }
 
 export default Navbar;
-
-// import {
-//   FiSearch,
-//   FiMoon,
-//   FiUser,
-//   FiChevronDown,
-// } from "react-icons/fi";
-
-// import { RiExchangeDollarLine } from "react-icons/ri";
-// import { BsGraphUpArrow } from "react-icons/bs";
-
-// const timeframes = ["1m", "5m", "15m", "1H", "4H", "1D"];
-
-// function Navbar() {
-//   return (
-//     <header className="h-14 border-b border-[#2a2e39] bg-[#131722] px-5 flex items-center justify-between">
-
-//       {/* Left */}
-//       <div className="flex items-center gap-6">
-
-//         <div className="flex items-center gap-2">
-
-//           <BsGraphUpArrow className="text-blue-500 text-xl"/>
-
-//           <h1 className="text-white text-lg font-bold tracking-wide">
-//             AlgoTrade
-//           </h1>
-
-//         </div>
-
-//         {/* Exchange */}
-
-//         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c2330] hover:bg-[#252c3a] transition">
-
-//           <RiExchangeDollarLine className="text-gray-400"/>
-
-//           <span className="text-sm text-white">
-//             Binance
-//           </span>
-
-//           <FiChevronDown className="text-gray-400"/>
-
-//         </button>
-
-//         {/* Symbol */}
-
-//         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c2330] hover:bg-[#252c3a] transition">
-
-//           <span className="text-sm font-semibold text-green-400">
-//             BTC/USDT
-//           </span>
-
-//           <FiChevronDown className="text-gray-400"/>
-
-//         </button>
-
-//       </div>
-
-//       {/* Center */}
-
-//       <div className="flex items-center gap-2">
-
-//         {timeframes.map((item) => (
-
-//           <button
-//             key={item}
-//             className={`px-3 py-1 rounded-md text-sm transition
-//             ${
-//               item === "15m"
-//                 ? "bg-blue-600 text-white"
-//                 : "text-gray-400 hover:bg-[#1c2330] hover:text-white"
-//             }`}
-//           >
-//             {item}
-//           </button>
-
-//         ))}
-
-//       </div>
-
-//       {/* Right */}
-
-//       <div className="flex items-center gap-3">
-
-//         <button className="px-3 py-1.5 rounded-lg bg-[#1c2330] text-gray-300 hover:bg-[#252c3a]">
-
-//           Indicators
-
-//         </button>
-
-//         <button className="p-2 rounded-lg hover:bg-[#1c2330]">
-
-//           <FiSearch className="text-gray-300"/>
-
-//         </button>
-
-//         <button className="p-2 rounded-lg hover:bg-[#1c2330]">
-
-//           <FiMoon className="text-gray-300"/>
-
-//         </button>
-
-//         <button className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center">
-
-//           <FiUser className="text-white"/>
-
-//         </button>
-
-//       </div>
-
-//     </header>
-//   );
-// }
-
-// export default Navbar;

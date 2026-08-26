@@ -1,83 +1,56 @@
-//ChartCanvas.jsx
+//chartcanvs.jsx
 import { useCallback, useEffect, useRef } from "react";
-
 import { ChartEngine } from "./ChartEngine";
-
 import { useChart } from "../../hooks/useChart";
-
 import { loadIndicator } from "../../hooks/useIndicator";
-
 import useChartStore from "../../store/chartStore";
-
 import useIndicatorStore from "../../store/indicatorStore";
-import { setFeatureDefinitions } from "framer-motion";
-
-// import addsingle from "../../components/chart/IndicatorManager" ;
-// import addSupertrend from "../../components/chart/IndicatorManager"
+import { time } from "framer-motion";
+// import WebSocket  from "vite";
 
 function ChartCanvas() {
-
   const containerRef = useRef(null);
-
   const engineRef = useRef(null);
+  const wsRef = useRef(null);
 
   const exchange = useChartStore((s) => s.exchange);
-
+  console.log("exchange",exchange)
   const symbol = useChartStore((s) => s.symbol);
-
+  console.log("symbol", symbol)
   const timeframe = useChartStore((s) => s.timeframe);
+  console.log("timeframe", timeframe)
 
-  // ===== Change Start =====
-  // Ye change isliye kiya kyuki active ChartCanvas me indicatorStore ka data use nahi ho raha tha.
-  // Agar ye nahi karenge to EMA/SMA/RSI add hone ke baad bhi same main chart engine me render nahi honge.
-  // Iska effect ye hoga ki existing Zustand indicator list se chart par indicators load ho payenge.
   const indicators = useIndicatorStore((s) => s.indicators);
-  // ===== Change End =====
 
-  const {
-    data,
-    isLoading
-    } = useChart(
-    exchange,
-    symbol,
-    timeframe
-  );
+  const { data, isLoading } = useChart(exchange, symbol, timeframe);
 
-  // ===== Change Start =====
-  // Ye change isliye kiya kyuki backend indicator response indicator.id ke andar data return karta hai.
-  // Agar ye helper nahi hoga to EMA/RSI API successful hone ke baad bhi frontend data nahi dhoond payega.
-  // useCallback isliye use kiya kyuki ye helpers indicator loading effect ke dependency chain me use hote hain.
-  // Iska effect ye hoga ki single aur multi-output dono indicators correct data payload se render honge.
+  // Helper to extract indicator payload
   const getIndicatorPayload = useCallback((result, indicator) => {
-
     if (!result) return null;
-
-    return result[indicator.id] ||
+    return (
+      result[indicator.id] ||
       result[indicator.type] ||
       result[indicator.type.toLowerCase()] ||
       result.data ||
       result.values ||
-      result;
-
+      result
+    );
   }, []);
 
+  // Helper for styling indicator lines
   const getSeriesStyle = useCallback((indicator, outputKey = "") => {
-
-    //  Grab both style and settings safely
     const style = indicator.style || {};
     const settings = indicator.settings || {};
-
     const key = outputKey.toUpperCase();
 
-    //  UPDATED COLOR RESOLUTION CHAIN
     const color =
       (key === "SIGNAL" && style.signalColor) ||
       (key === "MACD" && style.macdColor) ||
       (key.includes("K") && style.kColor) ||
       (key.includes("D") && style.dColor) ||
-      settings.color || // Check user setting overrides from the picker first!
-      style.color ||   //  Fall back to registry asset configurations
-      "#e9ebf1";        // Default fallback theme color
+      settings.color ||
+      style.color ||
+      "#e9ebf1";
 
     return {
       color,
@@ -85,165 +58,280 @@ function ChartCanvas() {
       priceLineVisible: false,
       pane: indicator.pane || "main",
     };
-
   }, []);
 
-
+  // Helper for histogram data
   const getHistogramData = useCallback((dataList, indicator) => {
-
     const style = indicator.style || {};
-
     return dataList.map((item) => ({
       ...item,
-      color: item.value >= 0
-        ? style.histogramUp || "#22C55E"
-        : style.histogramDown || "#EF4444",
+      color:
+        item.value >= 0
+          ? style.histogramUp || "#22C55E"
+          : style.histogramDown || "#EF4444",
     }));
-
   }, []);
 
-  const renderIndicatorPayload = useCallback((indicator, payload) => {
+  // Helper to render indicators
+  const renderIndicatorPayload = useCallback(
+    (indicator, payload) => {
+      if (!engineRef.current || !engineRef.current.indicatorManager) return;
 
-    if (Array.isArray(payload)) {
-      engineRef.current.indicatorManager.addSingle(
-        indicator.id,
-        payload,
-        getSeriesStyle(indicator)
-      );
-      return;
-    }
-
-    if (!payload || typeof payload !== "object") {
-      console.warn(
-        `Skipping ${indicator.type}: API response ka format supported nahi hai.`,
-        payload
-      );
-      return;
-    }
-
-    Object.entries(payload).forEach(([outputKey, outputData]) => {
-
-      if (!Array.isArray(outputData) || outputData.length === 0) return;
-
-      const seriesName = `${indicator.id}-${outputKey}`;
-
-      if (outputKey.toUpperCase().includes("HIST")) {
-        engineRef.current.indicatorManager.addHistogram(
-          seriesName,
-          getHistogramData(outputData, indicator),
-          {
-            priceFormat: { type: "volume" },
-            priceLineVisible: false,
-            pane: indicator.pane || "main",
-          }
+      if (Array.isArray(payload)) {
+        engineRef.current.indicatorManager.addSingle(
+          indicator.id,
+          payload,
+          getSeriesStyle(indicator)
         );
         return;
       }
 
-      // if (
-      //     indicator.type.toLowerCase() === "SUPERTREND" ||
-      //     outputKey.toLowerCase() === "supertrend"
-      // ) {
-      //     print("enter in supertrend")
-      //     console.log("supertrend enter")
-      //     engineRef.current.indicatorManager.addSupertrend(
-      //         seriesName,
-      //         outputData,
-      //         getSeriesStyle(indicator, outputKey)
-      //     );
+      if (!payload || typeof payload !== "object") {
+        console.warn(
+          `Skipping ${indicator.type}: API response format not supported.`,
+          payload
+        );
+        return;
+      }
 
-      //     return;
-      // }
-      // const indicatorType = String(indicator.type || "").toLowerCase();
-      // const outputType = String(outputKey || "").toLowerCase();
+      Object.entries(payload).forEach(([outputKey, outputData]) => {
+        if (!Array.isArray(outputData) || outputData.length === 0) return;
 
-      // const isSupertrend =
-      //     indicatorType.includes("supertrend") ||
-      //     outputType.includes("supertrend");
+        const seriesName = `${indicator.id}-${outputKey}`;
 
-      // if (isSupertrend) {
+        if (outputKey.toUpperCase().includes("HIST")) {
+          engineRef.current.indicatorManager.addHistogram(
+            seriesName,
+            getHistogramData(outputData, indicator),
+            {
+              priceFormat: { type: "volume" },
+              priceLineVisible: false,
+              pane: indicator.pane || "main",
+            }
+          );
+          return;
+        }
 
-      //     console.log("🔥 USING SUPERTREND RENDERER");
+        engineRef.current.indicatorManager.addSingle(
+          seriesName,
+          outputData,
+          getSeriesStyle(indicator, outputKey)
+        );
+      });
+    },
+    [getHistogramData, getSeriesStyle]
+  );
 
-      //     engineRef.current.indicatorManager.addSupertrend(
-      //         seriesName,
-      //         outputData,
-      //         getSeriesStyle(indicator, outputKey)
-      //     );
-        
-      //     return;
-      // }
-
-      engineRef.current.indicatorManager.addSingle(
-        seriesName,
-        outputData,
-        getSeriesStyle(indicator, outputKey)
-      );
-
-    });
-
-  }, [getHistogramData, getSeriesStyle]);
-  // ===== Change End =====
-console.log("hello")
+  // 1. Initialize Chart Engine
   useEffect(() => {
-
     if (!containerRef.current) return;
 
-    engineRef.current =
-      new ChartEngine(containerRef.current,{
-        type:"price"
-      });
-      
-
+    engineRef.current = new ChartEngine(containerRef.current, {
+      type: "price",
+    });
+      // console.log("in chart engine hello")
     return () => {
-
-      engineRef.current.destroy();
-
+      if (engineRef.current) {
+        engineRef.current.destroy();
+        engineRef.current = null;
+      }
     };
-
   }, []);
 
+  
   useEffect(() => {
-
     if (!engineRef.current) return;
 
-    engineRef.current.setData(data);   // setcandles to setdata
+    // Close previous WebSocket
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
 
-    // Volume Data
-    const volumeData = data.map((candle) => ({
-        time: candle.time,
-        value: candle.volume,
-        color:
-            candle.close >= candle.open
-                ? "#22C55E"
-                : "#EF4444",
-    }));
+    // Convert HTTP protocol to WS protocol
+    const wsProtocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
 
-    engineRef.current.setVolume(volumeData);  // addvolume to setvolume
+    // Local FastAPI backend
+    const wsHost =
+      import.meta.env.VITE_WS_HOST || "127.0.0.1:8000";
 
-    engineRef.current.fit();
+    // Encode symbol because symbols can contain "/"
+    // const encodedSymbol = encodeURIComponent(symbol);
 
-  }, [data]);
+    // const socketUrl =
+    //   `${wsProtocol}//${wsHost}/live/ws/candles/` +
+    //   `binance/BTCUSDT/1m`;
+    const formatSymbol = symbol.replace("/","")
+    // const socketUrl =
+    //   `wss://socket.delta.exchange/websocket`;
+    const socketUrl =
+      `${wsProtocol}//${wsHost}/live/ws/candles/` +
+      `${exchange}/${formatSymbol}/${timeframe}`;
 
-  // ===== Change Start =====
-  // Ye change isliye kiya kyuki indicators ko active one-chart architecture me render karna hai.
-  // Existing loadIndicator API aur indicatorStore ko reuse kiya hai, taaki project ka current flow same rahe.
-  // Agar ye nahi karenge to ChartHeader se add kiya hua indicator store me rahega par chart par nahi dikhega.
-  // Iska effect ye hoga ki main-pane indicators ab same chart me add honge, aur pane info manager ko pass hogi.
+    console.log("📡 Connecting WebSocket:", socketUrl);
+
+    const ws = new WebSocket(socketUrl);
+
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log(
+        `✅ WebSocket connected: ${exchange}/${symbol}/${timeframe}`
+      );
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+
+        console.log("📡 WebSocket message:", message);
+
+        if (!engineRef.current) return;
+
+        // =========================
+        // HISTORY
+        // =========================
+        if (message.type === "history") {
+          const candles = message.data.map((candle) => ({
+            // Backend history timestamp is milliseconds
+            time: Math.floor(candle[0] / 1000),
+
+            open: Number(candle[1]),
+            high: Number(candle[2]),
+            low: Number(candle[3]),
+            close: Number(candle[4]),
+          }));
+
+          const volumes = message.data.map((candle) => ({
+            // Backend history timestamp is milliseconds
+            time: Math.floor(candle[0] / 1000),
+
+            value: Number(candle[5] ?? 0),
+
+            color:
+              Number(candle[4]) >= Number(candle[1])
+                ? "rgba(34, 197, 94, 0.7)"
+                : "rgba(239, 68, 68, 0.7)",
+          }));
+
+          // Set candles through ChartEngine
+          engineRef.current.setData(candles);
+
+          // Set volume through ChartEngine
+          engineRef.current.setVolume(volumes);
+
+          // Fit chart to data
+          engineRef.current.fit();
+
+          console.log(
+            `✅ Loaded ${candles.length} historical candles`
+          );
+
+          return;
+        }
+
+        // =========================
+        // LIVE UPDATE
+        // =========================
+        if (message.type === "update") {
+          const candle = message.data;
+
+          const liveCandle = {
+            // Backend update timestamp is already seconds
+            time: Number(candle.time),
+
+            open: Number(candle.open),
+            high: Number(candle.high),
+            low: Number(candle.low),
+            close: Number(candle.close),
+          };
+
+          const liveVolume = {
+            time: Number(candle.time),
+
+            value: Number(candle.volume ?? 0),
+
+            color:
+              Number(candle.close) >= Number(candle.open)
+                ? "rgba(34, 197, 94, 0.7)"
+                : "rgba(239, 68, 68, 0.7)",
+          };
+
+          // Update candle
+          engineRef.current.updateCandle(liveCandle);
+
+          // Update volume
+          engineRef.current.updateVolume(liveVolume);
+
+          console.log("📈 Live candle:", liveCandle);
+          console.log("📊 Live volume:", liveVolume);
+        }
+      } catch (error) {
+        console.error(
+          "❌ WebSocket message parsing error:",
+          error,
+          event.data
+        );
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error(
+        "❌ WebSocket Error:",
+        error
+      );
+    };
+
+    ws.onclose = (event) => {
+      console.log(
+        "🔌 WebSocket disconnected",
+        event.code,
+        event.reason
+      );
+    };
+
+    const handleResize = () => {
+  if (!engineRef.current || !containerRef.current) return;
+
+  // Safe execution: Only runs if applyOptions exists as a function
+  if (typeof engineRef.current.applyOptions === 'function') {
+    engineRef.current.applyOptions({
+      width: containerRef.current.clientWidth,
+    });
+  } else if (engineRef.current.chart && typeof engineRef.current.chart.applyOptions === 'function') {
+    // Fallback if your chartengine.js wraps the chart inside an object property
+    engineRef.current.chart.applyOptions({
+      width: containerRef.current.clientWidth,
+    });
+  }
+};
+
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup ONLY WebSocket
+    return () => {
+      window.removeEventListener("resize", handleResize);
+
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [exchange, symbol, timeframe]);
+  // 3. Load & Render Indicators from Store
   useEffect(() => {
-
     if (!engineRef.current) return;
-
+    // console.log("heelo")
     let isMounted = true;
 
     async function loadIndicators() {
+      if (!engineRef.current.indicatorManager) return;
 
       engineRef.current.indicatorManager.removeAll();
 
       for (const indicator of indicators) {
-
         try {
-
           const result = await loadIndicator(
             exchange,
             symbol,
@@ -253,26 +341,12 @@ console.log("hello")
 
           if (!isMounted || !engineRef.current) return;
 
-          // ===== Change Start =====
-          // Ye change isliye kiya kyuki backend result direct ema/rsi key me nahi, indicator.id key me bhejta hai.
-          // Multi-output indicators jaise MACD object return karte hain, isliye unke har output ko alag series banana hai.
-          // Iska effect ye hoga ki EMA/RSI single line aur MACD line+signal+histogram same chart architecture me render honge.
           const payload = getIndicatorPayload(result, indicator);
-
           renderIndicatorPayload(indicator, payload);
-          // ===== Change End =====
-
         } catch (error) {
-
-          console.error(
-            `Failed to render indicator ${indicator.type}`,
-            error
-          );
-
+          console.error(`Failed to render indicator ${indicator.type}`, error);
         }
-
       }
-
     }
 
     loadIndicators();
@@ -280,114 +354,222 @@ console.log("hello")
     return () => {
       isMounted = false;
     };
-
-  }, [indicators, exchange, symbol, timeframe, getIndicatorPayload, renderIndicatorPayload]);
-  // ===== Change End =====
-
-  // new useffect for live chart using websockets
-
-  // ADD THIS HOOK TO STREAMS LIVE TICKER CANDLE TRANSFERS
-  // useEffect(() => {
-  //   if (!engineRef.current || !exchange || !symbol || !timeframe) return;
-
-  //   // Build matching WS protocol URI pointing directly to your local FastAPI service routing
-  //   const socketUrl = `ws://localhost:8000/indicator/ws/candles/${exchange}/${symbol}/${timeframe}`;
-  //   const ws = new WebSocket(socketUrl);
-
-  //   ws.onopen = () => {
-  //     console.log(`📡 WebSocket Connected live to ticker stream: ${symbol}`);
-  //   };
-
-  //   ws.onmessage = (event) => {
-  //     try {
-  //       const liveCandle = JSON.parse(event.data);
-        
-  //       if (!engineRef.current || !liveCandle) return;
-
-  //       // 1. Feed the live tick candle directly into your ChartEngine structure loop
-  //       // Lightweight Charts/TradingView engines natively expect single records inside update()
-  //       if (engineRef.current.updateData) {
-  //         engineRef.current.updateData(liveCandle);
-  //       } else if (engineRef.current.candleSeries) {
-  //         engineRef.current.candleSeries.update(liveCandle);
-  //       } else {
-  //         // If you have a custom canvas hook inside your engine:
-  //         engineRef.current.setData((prev) => {
-  //           const copy = [...prev];
-  //           const lastIdx = copy.length - 1;
-            
-  //           if (lastIdx >= 0 && copy[lastIdx].time === liveCandle.time) {
-  //             copy[lastIdx] = liveCandle; // Replace/update final forming active candle
-  //           } else {
-  //             copy.push(liveCandle); // Spawns a brand new candlestick node structural frame
-  //           }
-  //           return copy;
-  //         });
-  //       }
-
-  //       // 2. Format and pipe matching volumes alongside it
-  //       const volumeTick = {
-  //         time: liveCandle.time,
-  //         value: liveCandle.volume,
-  //         color: liveCandle.close >= liveCandle.open ? "#22C55E" : "#EF4444"
-  //       };
-        
-  //       if (engineRef.current.volumeSeries) {
-  //         engineRef.current.volumeSeries.update(volumeTick);
-  //       }
-
-  //     } catch (err) {
-  //       console.error("Error reading incoming stream data framework socket packet:", err);
-  //     }
-  //   };
-
-  //   ws.onerror = (error) => {
-  //     console.error("WebSocket network error occurred:", error);
-  //   };
-
-  //   ws.onclose = () => {
-  //     console.log("📡 WebSocket disconnected safely from server.");
-  //   };
-
-  //   // Clean up current running connection streams when market selectors swap indices
-  //   return () => {
-  //     ws.close();
-  //   };
-  // }, [exchange, symbol, timeframe]);
+  }, [
+    indicators,
+    exchange,
+    symbol,
+    timeframe,
+    getIndicatorPayload,
+    renderIndicatorPayload,
+  ]);
 
   return (
+    // UI CHANGE: Added professional chart surface, border contrast, and polished loading overlay.
+    <div className="relative min-h-[460px] flex-1 bg-[#070b11]">
+      <div ref={containerRef} className="h-full min-h-[420px]" />
 
-    <div className="relative flex-1">
-
-        <div
-            ref={containerRef}
-            className="h-full"
-        />
-
-        {isLoading && (
-
-            <div className="absolute inset-0 bg-[#0D1117]/60 backdrop-blur-sm flex items-center justify-center z-50">
-
-                <div className="flex flex-col items-center gap-3">
-
-                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"/>
-
-                    <p className="text-gray-300 text-sm">
-
-                        Loading Chart...
-
-                    </p>
-
-                </div>
-
-            </div>
-
-        )}
-
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#070b11]/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-md border border-[#263142] bg-[#0b1017] px-6 py-5 shadow-2xl shadow-black/40">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+            <p className="text-sm font-medium text-slate-300">Loading market data...</p>
+          </div>
+        </div>
+      )}
     </div>
-
   );
-
 }
 
 export default ChartCanvas;
+
+// 2. Load Historical Data & Volume from REST API
+  // useEffect(() => {
+  //   if (!engineRef.current || !data || data.length === 0) return;
+
+  //   // Set Candlestick Historical Data
+  //   engineRef.current.setData(data);
+
+  //   // Map & Set Volume Data
+  //   const volumeData = data.map((candle) => ({
+  //     time: candle.time,
+  //     value: candle.volume ?? candle.value ?? 0,
+  //     color: candle.close >= candle.open ? "#22C55E" : "#EF4444",
+  //   }));
+
+  //   engineRef.current.setVolume(volumeData);
+  //   engineRef.current.fit();
+  // }, [data]);
+  
+  // useEffect(() => {
+  //     // if (!chartContainerRef.current) return;
+  //     if (!engineRef.current || !data || data.length === 0) return; /// add
+      
+  //     // 2. Initialize TradingView Chart Canvas
+  //     // const chart = createChart(chartContainerRef.current, {
+  //     //   width: chartContainerRef.current.clientWidth,
+  //     //   height: 400,
+  //     //   layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
+  //     //   grid: { vertLines: { color: '#2b2b3a' }, horzLines: { color: '#2b2b3a' } },
+  //     //   timeScale: { timeVisible: true, secondsVisible: false },
+  //     // });
+  
+  //     // // 3. Add fresh series configuration
+  //     // const candleSeries = chart.addSeries(CandlestickSeries,{
+  //     //   upColor: '#26a69a', downColor: '#ef5350',
+  //     //   borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+  //     //   wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+  //     // });
+  //     // candleSeriesRef.current = candleSeries;
+  
+  //     // 4. Construct the Dynamic FastAPI Router Endpoint Path
+  //     // const wsUrl = `ws://localhost:8000/live/ws/candles/${exchange}/${symbol}/${timeframe}`;
+  //     // console.log(`📡 Connecting to new stream: ${wsUrl}`);
+      
+  //     // const ws = new WebSocket(wsUrl);
+  //     // wsRef.current = ws;
+  
+  //     // ws.onopen = () => console.log(`✅ Connected to ${exchange.toUpperCase()}`);
+  //     // // 5. Update the chart stream with new JSON ticks
+  //     // ws.onmessage = (event) => {
+  //     //   try {
+  //     //     const liveCandle = JSON.parse(event.data);
+  //     //     if (candleSeriesRef.current) {
+  //     //       candleSeriesRef.current.update(liveCandle);
+  //     //     }
+  //     //   } catch (err) {
+  //     //     console.error("Parsing error:", err);
+  //     //   }
+  //     // };
+  
+      
+  //     // ws.onerror = (error) => console.error("❌ WebSocket Error:", error);
+  //     // ws.onclose = () => console.log("🔌 Previous WebSocket closed.");
+  
+  //     // const ws = new WebSocket(
+  //     //   "ws://localhost:8000/live/ws/candles/binance/BTCUSDT/15m"
+  //     // );
+  //     // const ws = new WebSocket(
+  //     //   `ws://ws://localhost:8000/live/ws/candles/${exchange}/${symbol}/${timeframe}``
+  //     //   // ws://localhost:8000/live/ws/candles/coinbase/BTC-USD/15m
+  //     // );
+  //     const socketUrl = window.location.protocol === 'https:' ? `wss://ws://localhost:8000/live/ws/candles/${exchange}/${symbol}/${timeframe}` : `ws://localhost:8000/live/ws/candles/${exchange}/${symbol}/${timeframe}`;
+
+  //     const ws = new WebSocket(socketUrl)
+  
+  //     ws.onopen = () => {
+  //       console.log("✅ WebSocket connected");
+  //     };
+  
+  //     // ws.onmessage = (event) => {
+  //     //   const message = JSON.parse(event.data);
+      
+  //     //   console.log("📡 WebSocket:", message);
+  //     //   engineRef.current.setdata(data);
+      
+  //     //   // if (message.type === "history") {
+  //     //   //   const candles = message.data.map((candle) => ({
+  //     //   //     time: Math.floor(candle[0] / 1000),
+  //     //   //     // time: candle[0],
+  //     //   //     open: candle[1],
+  //     //   //     high: candle[2],
+  //     //   //     low: candle[3],
+  //     //   //     close: candle[4],
+  //     //   //   }));
+  //     //   //   engineRef.current.setData(candles); // addd
+  //     //     // candleSeries.setData(candles);
+  //     //   // }
+      
+  //     //   if (message.type === "update") {
+  //     //     const candle = message.data;
+        
+  //     //     // candleSeries.update({
+  //     //     //   time: candle.time,
+  //     //     //   open: candle.open,
+  //     //     //   high: candle.high,
+  //     //     //   low: candle.low,
+  //     //     //   close: candle.close,
+  //     //     // });
+
+  //     //     engineRef.current.update({
+  //     //       time: candle.time,
+  //     //       open: candle.open,
+  //     //       high: candle.high,
+  //     //       low: candle.low,
+  //     //       close: candle.close,
+  //     //     });
+  //     //   }
+  //     // };
+  //     ws.onmessage = (event) => {
+  //       const message = JSON.parse(event.data);
+
+  //       if (message.type === "history") {
+  //         const candles = message.data.map((candle) => ({
+  //           // time: Math.floor(candle[0] / 1000),
+  //           time: candle[0],
+  //           open: candle[1],
+  //           high: candle[2],
+  //           low: candle[3],
+  //           close: candle[4],
+  //         }));
+        
+  //         const volumes = message.data.map((candle) => ({
+  //           // time: Math.floor(candle[0] / 1000),
+  //           time: candle[0],
+  //           value: candle[5],
+  //           color:
+  //             candle[4] >= candle[1]
+  //               ? "rgba(0, 200, 150, 0.7)"
+  //               : "rgba(255, 80, 80, 0.7)",
+  //         }));
+        
+  //         candleSeries.setData(candles);
+  //         volumeSeries.setData(volumes);
+  //       }
+      
+  //       if (message.type === "update") {
+  //         const candle = message.data;
+        
+  //         candleSeries.update({
+  //           time: candle.time,
+  //           open: candle.open,
+  //           high: candle.high,
+  //           low: candle.low,
+  //           close: candle.close,
+  //         });
+        
+  //         volumeSeries.update({
+  //           time: candle.time,
+  //           value: candle.volume,
+  //           color:
+  //             candle.close >= candle.open
+  //               ? "rgba(0, 200, 150, 0.7)"
+  //               : "rgba(255, 80, 80, 0.7)",
+  //         });
+  //       }
+  //     };
+  //     ws.onerror = (error) => {
+  //       console.error("❌ WebSocket Error:", error ,"ws error " , ws.onerror);
+        
+  //     };
+  
+  //     ws.onclose = () => {
+  //       console.log("🔌 WebSocket disconnected");
+  //     };
+  
+  //     const handleResize = () => {
+  //       engineRef.current.applyOptions({ width: containerRef.current.clientWidth });
+  //     };
+  //     window.addEventListener('resize', handleResize);
+  
+  //     // 6. CRITICAL CLEANUP: Runs every time a user changes a dropdown!
+  //     // Closes the old connection & destroys the old chart before building the new one
+  //     return () => {
+  //       window.removeEventListener('resize', handleResize);
+  //       if (wsRef.current) {
+  //         wsRef.current.close();
+  //       }
+  //       // engineRef.current.remove();
+  //     };
+      
+  //     // 7. Hook Dependancy Array recalculates the whole effect when these values change
+  //   }, [exchange, symbol, timeframe]);
