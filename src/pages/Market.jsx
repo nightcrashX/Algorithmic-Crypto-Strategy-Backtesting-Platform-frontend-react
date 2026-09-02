@@ -1,26 +1,22 @@
 import {
   BarChart3,
   Bell,
-  ChevronDown,
   Search,
   Star,
   ArrowUpDown,
   X,
+  TrendingUp,
+  TrendingDown,
+  Flame,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import useChartStore from "../store/chartStore";
 
-const WS_URL =
-  "wss://stream.binance.com:9443/ws/!miniTicker@arr";
-
-/*
-|--------------------------------------------------------------------------
-| Fixed initial order
-|--------------------------------------------------------------------------
-| WebSocket updates NEVER change this order.
-| You can add/remove symbols here if you want a custom default order.
-*/
+const WS_URL = "wss://stream.binance.com:9443/ws/!miniTicker@arr";
 
 const DEFAULT_ORDER = [
   "BTCUSDT",
@@ -40,1255 +36,622 @@ const DEFAULT_ORDER = [
   "BCHUSDT",
 ];
 
-/*
-|--------------------------------------------------------------------------
-| Coin metadata
-|--------------------------------------------------------------------------
-| WebSocket provides prices/volume/high/low.
-| Static metadata provides display name/logo/category.
-|
-| Add more coins here whenever required.
-*/
-
 const COIN_METADATA = {
-  BTCUSDT: {
-    name: "Bitcoin",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  ETHUSDT: {
-    name: "Ethereum",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  USDTUSDT: {
-    name: "Tether",
-    category: "Payments",
-    type: "Crypto",
-  },
-  BNBUSDT: {
-    name: "BNB",
-    category: "BSC",
-    type: "Crypto",
-  },
-  SOLUSDT: {
-    name: "Solana",
-    category: "Solana",
-    type: "Crypto",
-  },
-  XRPUSDT: {
-    name: "XRP",
-    category: "Payments",
-    type: "Crypto",
-  },
-  DOGEUSDT: {
-    name: "Dogecoin",
-    category: "MEME",
-    type: "Crypto",
-  },
-  ADAUSDT: {
-    name: "Cardano",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  TRXUSDT: {
-    name: "TRON",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  AVAXUSDT: {
-    name: "Avalanche",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  LINKUSDT: {
-    name: "Chainlink",
-    category: "AI",
-    type: "Crypto",
-  },
-  DOTUSDT: {
-    name: "Polkadot",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  MATICUSDT: {
-    name: "Polygon",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  LTCUSDT: {
-    name: "Litecoin",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
-  BCHUSDT: {
-    name: "Bitcoin Cash",
-    category: "Layer 1 / Layer 2",
-    type: "Crypto",
-  },
+  BTCUSDT: { name: "Bitcoin", category: "Layer 1 / Layer 2", type: "Crypto" },
+  ETHUSDT: { name: "Ethereum", category: "Layer 1 / Layer 2", type: "Crypto" },
+  USDTUSDT: { name: "Tether", category: "Payments", type: "Crypto" },
+  BNBUSDT: { name: "BNB", category: "BSC", type: "Crypto" },
+  SOLUSDT: { name: "Solana", category: "Solana", type: "Crypto" },
+  XRPUSDT: { name: "XRP", category: "Payments", type: "Crypto" },
+  DOGEUSDT: { name: "Dogecoin", category: "MEME", type: "Crypto" },
+  ADAUSDT: { name: "Cardano", category: "Layer 1 / Layer 2", type: "Crypto" },
+  TRXUSDT: { name: "TRON", category: "Layer 1 / Layer 2", type: "Crypto" },
+  AVAXUSDT: { name: "Avalanche", category: "Layer 1 / Layer 2", type: "Crypto" },
+  LINKUSDT: { name: "Chainlink", category: "AI", type: "Crypto" },
+  DOTUSDT: { name: "Polkadot", category: "Layer 1 / Layer 2", type: "Crypto" },
+  MATICUSDT: { name: "Polygon", category: "Layer 1 / Layer 2", type: "Crypto" },
+  LTCUSDT: { name: "Litecoin", category: "Layer 1 / Layer 2", type: "Crypto" },
+  BCHUSDT: { name: "Bitcoin Cash", category: "Layer 1 / Layer 2", type: "Crypto" },
 };
-
-/*
-|--------------------------------------------------------------------------
-| Helpers
-|--------------------------------------------------------------------------
-*/
 
 function getSymbolName(symbol) {
   if (!symbol) return "";
+  return symbol.endsWith("USDT") ? symbol.slice(0, -4) : symbol;
+}
 
-    return symbol.endsWith("USDT")
-      ? symbol.slice(0, -4)
-      : symbol;
+function formatPrice(value) {
+  const price = Number(value);
+  if (!Number.isFinite(price)) return "--";
+  if (price >= 1000) {
+    return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+  if (price >= 1) {
+    return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  }
+  if (price >= 0.01) {
+    return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  }
+  return price.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 8 });
+}
 
-  function formatPrice(value) {
-    const price = Number(value);
+function formatCompact(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "--";
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(number);
+}
 
-    if (!Number.isFinite(price)) return "--";
+function formatPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0.00";
+  return number.toFixed(2);
+}
 
-    if (price >= 1000) {
-      return price.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+function Market() {
+  const setSymbol = useChartStore((state) => state.setSymbol);
+  const navigate = useNavigate();
+
+  const [marketData, setMarketData] = useState({});
+  const [search, setSearch] = useState("");
+  const [activeMainTab, setActiveMainTab] = useState("Cryptos");
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: "desc",
+  });
+
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("marketFavorites")) || [];
+    } catch {
+      return [];
     }
+  });
 
-    if (price >= 1) {
-      return price.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
-      });
-    }
+  const symbolOrderRef = useRef([]);
 
-    if (price >= 0.01) {
-      return price.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 6,
-      });
-    }
+  useEffect(() => {
+    const ws = new window.WebSocket(WS_URL);
 
-    return price.toLocaleString("en-US", {
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 8,
-    });
-  }
+    ws.onopen = () => {
+      console.log("Binance market WebSocket connected");
+    };
 
-  function formatCompact(value) {
-    const number = Number(value);
-
-    if (!Number.isFinite(number)) return "--";
-
-    return new Intl.NumberFormat("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 2,
-    }).format(number);
-  }
-
-  function formatPercent(value) {
-    const number = Number(value);
-
-    if (!Number.isFinite(number)) return "0.00";
-
-    return number.toFixed(2);
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Main component
-  |--------------------------------------------------------------------------
-  */
-
-  function Market() {
-    const setSymbol = useChartStore((state) => state.setSymbol);
-
-    /*
-    |--------------------------------------------------------------------------
-    | State
-    |--------------------------------------------------------------------------
-    */
-
-    const [marketData, setMarketData] = useState({});
-    const [search, setSearch] = useState("");
-    const [activeMainTab, setActiveMainTab] = useState("Cryptos");
-    const [activeCategory, setActiveCategory] = useState("All");
-
-    const [sortConfig, setSortConfig] = useState({
-      key: null,
-      direction: "desc",
-    });
-
-    const [favorites, setFavorites] = useState(() => {
+    ws.onmessage = (event) => {
       try {
-        return JSON.parse(localStorage.getItem("marketFavorites")) || [];
-      } catch {
-        return [];
+        const data = JSON.parse(event.data);
+        if (!Array.isArray(data)) return;
+
+        setMarketData((previous) => {
+          const next = { ...previous };
+
+          if (symbolOrderRef.current.length === 0) {
+            const incomingSymbols = data.map((ticker) => ticker.s).filter(Boolean);
+            const preferred = DEFAULT_ORDER.filter((symbol) => incomingSymbols.includes(symbol));
+            const remaining = incomingSymbols.filter((symbol) => !preferred.includes(symbol));
+            symbolOrderRef.current = [...preferred, ...remaining];
+          }
+
+          data.forEach((ticker) => {
+            if (!ticker?.s) return;
+            const currentPrice = Number(ticker.c);
+            const openPrice = Number(ticker.o);
+            const highPrice = Number(ticker.h);
+            const lowPrice = Number(ticker.l);
+            const volume = Number(ticker.v);
+            const quoteVolume = Number(ticker.q);
+
+            const percentChange = openPrice > 0 ? ((currentPrice - openPrice) / openPrice) * 100 : 0;
+
+            next[ticker.s] = {
+              symbol: ticker.s,
+              price: Number.isFinite(currentPrice) ? currentPrice : 0,
+              open: Number.isFinite(openPrice) ? openPrice : 0,
+              change: Number.isFinite(percentChange) ? percentChange : 0,
+              high: Number.isFinite(highPrice) ? highPrice : 0,
+              low: Number.isFinite(lowPrice) ? lowPrice : 0,
+              volume: Number.isFinite(volume) ? volume : 0,
+              quoteVolume: Number.isFinite(quoteVolume) ? quoteVolume : 0,
+              name: COIN_METADATA[ticker.s]?.name || getSymbolName(ticker.s),
+              category: COIN_METADATA[ticker.s]?.category || "Crypto",
+              type: COIN_METADATA[ticker.s]?.type || "Crypto",
+            };
+          });
+
+          return next;
+        });
+      } catch (error) {
+        console.error("Error processing Binance WebSocket data:", error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("Binance WebSocket Error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("Binance market WebSocket disconnected");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("marketFavorites", JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (symbol) => {
+    setFavorites((previous) => {
+      if (previous.includes(symbol)) {
+        return previous.filter((item) => item !== symbol);
+      }
+      return [...previous, symbol];
+    });
+  };
+
+  const openChart = (symbol) => {
+    setSymbol(symbol);
+    navigate("/dashboard");
+  };
+
+  const orderedMarkets = useMemo(() => {
+    const list = [];
+    const used = new Set();
+
+    symbolOrderRef.current.forEach((symbol) => {
+      if (marketData[symbol]) {
+        list.push(marketData[symbol]);
+        used.add(symbol);
       }
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Stable symbol order
-    |--------------------------------------------------------------------------
-    */
+    Object.keys(marketData).forEach((symbol) => {
+      if (!used.has(symbol)) {
+        list.push(marketData[symbol]);
+      }
+    });
 
-    const symbolOrderRef = useRef([]);
+    return list;
+  }, [marketData]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Binance WebSocket
-    |--------------------------------------------------------------------------
-    */
+  const filteredMarkets = useMemo(() => {
+    let result = [...orderedMarkets];
 
-    useEffect(() => {
-      const ws = new window.WebSocket(WS_URL);
+    if (activeMainTab === "Favorites") {
+      result = result.filter((coin) => favorites.includes(coin.symbol));
+    }
 
-      ws.onopen = () => {
-        console.log("Binance market WebSocket connected");
-      };
+    if (activeCategory !== "All") {
+      result = result.filter((coin) => coin.category === activeCategory);
+    }
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (!Array.isArray(data)) return;
-
-          setMarketData((previous) => {
-            const next = { ...previous };
-
-            /*
-            |--------------------------------------------------------------------------
-            | IMPORTANT:
-            | Establish order only once.
-            | Future WebSocket messages NEVER change row order.
-            |--------------------------------------------------------------------------
-            */
-
-            if (symbolOrderRef.current.length === 0) {
-              const incomingSymbols = data
-                .map((ticker) => ticker.s)
-                .filter(Boolean);
-
-              /*
-              |--------------------------------------------------------------------------
-              | Put our preferred symbols first.
-              | Then append all remaining Binance symbols.
-              |--------------------------------------------------------------------------
-              */
-
-              const preferred = DEFAULT_ORDER.filter((symbol) =>
-                incomingSymbols.includes(symbol)
-              );
-
-              const remaining = incomingSymbols.filter(
-                (symbol) => !preferred.includes(symbol)
-              );
-
-              symbolOrderRef.current = [
-                ...preferred,
-                ...remaining,
-              ];
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Update each symbol individually
-            |--------------------------------------------------------------------------
-            */
-
-            data.forEach((ticker) => {
-              if (!ticker?.s) return;
-
-              const currentPrice = Number(ticker.c);
-              const openPrice = Number(ticker.o);
-              const highPrice = Number(ticker.h);
-              const lowPrice = Number(ticker.l);
-              const volume = Number(ticker.v);
-              const quoteVolume = Number(ticker.q);
-
-              /*
-              |--------------------------------------------------------------------------
-              | Binance miniTicker does NOT give P.
-              |
-              | Therefore:
-              |
-              | ((current - open) / open) * 100
-              |--------------------------------------------------------------------------
-              */
-
-              const percentChange =
-                openPrice > 0
-                  ? ((currentPrice - openPrice) / openPrice) * 100
-                  : 0;
-
-              next[ticker.s] = {
-                symbol: ticker.s,
-                price: Number.isFinite(currentPrice)
-                  ? currentPrice
-                  : 0,
-
-                open: Number.isFinite(openPrice)
-                  ? openPrice
-                  : 0,
-
-                change: Number.isFinite(percentChange)
-                  ? percentChange
-                  : 0,
-
-                high: Number.isFinite(highPrice)
-                  ? highPrice
-                  : 0,
-
-                low: Number.isFinite(lowPrice)
-                  ? lowPrice
-                  : 0,
-
-                volume: Number.isFinite(volume)
-                  ? volume
-                  : 0,
-
-                quoteVolume: Number.isFinite(quoteVolume)
-                  ? quoteVolume
-                  : 0,
-
-                name:
-                  COIN_METADATA[ticker.s]?.name ||
-                  getSymbolName(ticker.s),
-
-                category:
-                  COIN_METADATA[ticker.s]?.category ||
-                  "Crypto",
-
-                type:
-                  COIN_METADATA[ticker.s]?.type ||
-                  "Crypto",
-              };
-            });
-
-            return next;
-          });
-        } catch (error) {
-          console.error(
-            "Error processing Binance WebSocket data:",
-            error
-          );
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error(
-          "Binance WebSocket Error:",
-          error
-        );
-      };
-
-      ws.onclose = () => {
-        console.log(
-          "Binance market WebSocket disconnected"
-        );
-      };
-
-      return () => {
-        ws.close();
-      };
-    }, []);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Save favorites
-    |--------------------------------------------------------------------------
-    */
-
-    useEffect(() => {
-      localStorage.setItem(
-        "marketFavorites",
-        JSON.stringify(favorites)
+    const searchValue = search.trim().toLowerCase();
+    if (searchValue) {
+      result = result.filter(
+        (coin) =>
+          coin.symbol.toLowerCase().includes(searchValue) ||
+          coin.name.toLowerCase().includes(searchValue)
       );
-    }, [favorites]);
+    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Toggle favorite
-    |--------------------------------------------------------------------------
-    */
-
-    const toggleFavorite = (symbol) => {
-      setFavorites((previous) => {
-        if (previous.includes(symbol)) {
-          return previous.filter(
-            (item) => item !== symbol
-          );
-        } 
-
-        return [...previous, symbol];
-      });
-    };
-
-    /*
-    |--------------------------------------------------------------------------
-    | Open chart
-    |--------------------------------------------------------------------------
-    */
-
-    const openChart = (symbol) => {
-      /*
-      |--------------------------------------------------------------------------
-      | Convert BTCUSDT → BTC/USDT if your chart store expects that.
-      | If your store expects BTCUSDT, change this line to:
-      |
-      | setSymbol(symbol);
-      |--------------------------------------------------------------------------
-      */
-
-      setSymbol(symbol);
-
-      console.log("Chart for:", symbol);
-    };
-
-    /*
-    |--------------------------------------------------------------------------
-    | Convert object to array while preserving stable order
-    |--------------------------------------------------------------------------
-    */
-
-    const orderedMarkets = useMemo(() => {
-      return symbolOrderRef.current
-        .map((symbol) => marketData[symbol])
-        .filter(Boolean);
-    }, [marketData]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Filter + Sort
-    |--------------------------------------------------------------------------
-    */
-
-    const filteredMarkets = useMemo(() => {
-      let result = [...orderedMarkets];
-
-      /*
-      |--------------------------------------------------------------------------
-      | Main tabs
-      |--------------------------------------------------------------------------
-      */
-
-      if (activeMainTab === "Favorites") {
-        result = result.filter((coin) =>
-          favorites.includes(coin.symbol)
-        );
-      }
-
-      if (
-        activeMainTab === "Spot" ||
-        activeMainTab === "Futures"
-      ) {
-        /*
-        |--------------------------------------------------------------------------
-        | Current Binance WebSocket is spot ticker data.
-        | Keep all crypto data for now.
-        |--------------------------------------------------------------------------
-        */
-        result = result.filter(
-          (coin) => coin.type === "Crypto"
-        );
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Category
-      |--------------------------------------------------------------------------
-      */
-
-      if (activeCategory !== "All") {
-        result = result.filter(
-          (coin) => coin.category === activeCategory
-        );
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Search
-      |--------------------------------------------------------------------------
-      */
-
-      const searchValue = search.trim().toLowerCase();
-
-      if (searchValue) {
-        result = result.filter((coin) => {
-          return (
-            coin.symbol
-              .toLowerCase()
-              .includes(searchValue) ||
-            coin.name
-              .toLowerCase()
-              .includes(searchValue)
-          );
-        });
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Sorting
-      |--------------------------------------------------------------------------
-      |
-      | Sorting ONLY happens when the user clicks a column.
-      | WebSocket updates never trigger random sorting.
-      |--------------------------------------------------------------------------
-      */
-
-      if (sortConfig.key) {
-        result.sort((a, b) => {
-          let first;
-          let second;
-
-          if (sortConfig.key === "name") {
-            first = a.name.toLowerCase();
-            second = b.name.toLowerCase();
-          } else {
-            first = Number(a[sortConfig.key]) || 0;
-            second = Number(b[sortConfig.key]) || 0;
-          }
-
-          if (first < second) {
-            return sortConfig.direction === "asc"
-              ? -1
-              : 1;
-          }
-
-          if (first > second) {
-            return sortConfig.direction === "asc"
-              ? 1
-              : -1;
-          }
-
-          return 0;
-        });
-      }
-
-      return result;
-    }, [
-      orderedMarkets,
-      activeMainTab,
-      activeCategory,
-      search,
-      sortConfig,
-      favorites,
-    ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Sorting
-    |--------------------------------------------------------------------------
-    */
-
-    const handleSort = (key) => {
-      setSortConfig((previous) => {
-        if (previous.key !== key) {
-          return {
-            key,
-            direction: "desc",
-          };
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        let first;
+        let second;
+        if (sortConfig.key === "name") {
+          first = a.name.toLowerCase();
+          second = b.name.toLowerCase();
+        } else {
+          first = Number(a[sortConfig.key]) || 0;
+          second = Number(b[sortConfig.key]) || 0;
         }
 
-        return {
-          key,
-          direction:
-            previous.direction === "desc"
-              ? "asc"
-              : "desc",
-        };
+        if (first < second) return sortConfig.direction === "asc" ? -1 : 1;
+        if (first > second) return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
       });
-    };
+    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Market cards
-    |--------------------------------------------------------------------------
-    */
+    return result;
+  }, [orderedMarkets, activeMainTab, activeCategory, search, sortConfig, favorites]);
 
-    const hotMarkets = useMemo(() => {
-      return [...orderedMarkets]
-        .filter((coin) => coin.quoteVolume > 0)
-        .sort(
-          (a, b) =>
-            b.quoteVolume - a.quoteVolume
-        )
-        .slice(0, 3);
-    }, [orderedMarkets]);
+  const handleSort = (key) => {
+    setSortConfig((previous) => {
+      if (previous.key !== key) {
+        return { key, direction: "desc" };
+      }
+      return { key, direction: previous.direction === "desc" ? "asc" : "desc" };
+    });
+  };
 
-    const topGainers = useMemo(() => {
-      return [...orderedMarkets]
-        .sort(
-          (a, b) =>
-            b.change - a.change
-        )
-        .slice(0, 3);
-    }, [orderedMarkets]);
+  const hotMarkets = useMemo(() => {
+    return [...orderedMarkets]
+      .filter((coin) => coin.quoteVolume > 0)
+      .sort((a, b) => b.quoteVolume - a.quoteVolume)
+      .slice(0, 3);
+  }, [orderedMarkets]);
 
-    const topVolume = useMemo(() => {
-      return [...orderedMarkets]
-        .sort(
-          (a, b) =>
-            b.quoteVolume - a.quoteVolume
-        )
-        .slice(0, 3);
-    }, [orderedMarkets]);
+  const topGainers = useMemo(() => {
+    return [...orderedMarkets].sort((a, b) => b.change - a.change).slice(0, 3);
+  }, [orderedMarkets]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | New
-    |--------------------------------------------------------------------------
-    |
-    | WebSocket doesn't tell us listing date.
-    | For now use the last symbols from the stable list.
-    | Replace this with your listing API later.
-    |--------------------------------------------------------------------------
-    */
+  const topVolume = useMemo(() => {
+    return [...orderedMarkets].sort((a, b) => b.quoteVolume - a.quoteVolume).slice(0, 3);
+  }, [orderedMarkets]);
 
-    const newMarkets = useMemo(() => {
-      return orderedMarkets.slice(-3);
-    }, [orderedMarkets]);
+  const newMarkets = useMemo(() => {
+    return orderedMarkets.slice(-3);
+  }, [orderedMarkets]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Render
-    |--------------------------------------------------------------------------
-    */
+  const categories = [
+    "All",
+    "Layer 1 / Layer 2",
+    "Solana",
+    "BSC",
+    "MEME",
+    "AI",
+    "Payments",
+  ];
 
-    return (
-      <div className="min-h-screen bg-[#17191f] text-white">
-        <div className="space-y-8 px-5 py-5">
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-cyan-400" />
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">
+              Institutional Market Board
+            </p>
+          </div>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white lg:text-3xl">
+            Live Markets & Intelligence
+          </h1>
+          <p className="mt-1 text-xs text-slate-400">
+            Real-time Binance WebSocket price feeds, volume metrics, and market structure.
+          </p>
+        </div>
 
-          {/* ============================================================
-              HEADER
-          ============================================================ */}
-
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                Market Board
-              </p>
-
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-                Markets and Watchlist
-              </h1>
-
-              <p className="mt-2 text-sm text-slate-500">
-                Live crypto prices, volume, 24h ranges,
-                and market movements.
-              </p>
-            </div>
-
-            {/* Search */}
-
-            <div className="flex w-full items-center gap-3 lg:w-[360px]">
-              <div className="flex h-12 flex-1 items-center gap-3 rounded-lg border border-[#303642] bg-[#101217] px-4">
-                <Search
-                  size={18}
-                  className="text-slate-500"
-                />
-
-                <input
-                  value={search}
-                  onChange={(event) =>
-                    setSearch(event.target.value)
-                  }
-                  placeholder="Search symbol"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600"
-                />
-
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="text-slate-500 hover:text-white"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-
+        <div className="flex w-full items-center gap-2.5 lg:w-[360px]">
+          <div className="relative flex h-10 flex-1 items-center rounded-xl border border-white/[0.08] bg-[#0c121e] px-3 shadow-inner transition focus-within:border-cyan-400/50">
+            <Search size={15} className="text-slate-500" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search coin name or symbol..."
+              className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white outline-none placeholder:text-slate-600"
+            />
+            {search && (
               <button
                 type="button"
-                className="flex h-12 w-12 items-center justify-center rounded-lg border border-[#303642] bg-[#101217] text-slate-300 hover:text-white"
+                onClick={() => setSearch("")}
+                className="text-slate-500 hover:text-white"
               >
-                <Bell size={18} />
+                <X size={14} />
               </button>
-            </div>
+            )}
           </div>
 
-          {/* ============================================================
-              MARKET CARDS
-          ============================================================ */}
+          <button
+            type="button"
+            title="Notifications"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/[0.08] bg-[#0c121e] text-slate-400 shadow-sm hover:text-white"
+          >
+            <Bell size={16} />
+          </button>
+        </div>
+      </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MarketCard
+          title="Most Active"
+          icon={<Flame size={15} className="text-amber-400" />}
+          data={hotMarkets}
+          badge="High Liquidity"
+          badgeColor="text-amber-300 bg-amber-400/10 border-amber-400/20"
+        />
 
-            <MarketCard
-              title="Hot"
-              data={hotMarkets}
-            />
+        <MarketCard
+          title="Recent Additions"
+          icon={<Sparkles size={15} className="text-cyan-400" />}
+          data={newMarkets}
+          badge="Newly Tracked"
+          badgeColor="text-cyan-300 bg-cyan-400/10 border-cyan-400/20"
+        />
 
-            <MarketCard
-              title="New"
-              data={newMarkets}
-            />
+        <MarketCard
+          title="Top 24h Gainers"
+          icon={<TrendingUp size={15} className="text-emerald-400" />}
+          data={topGainers}
+          badge="Strong Momentum"
+          badgeColor="text-emerald-300 bg-emerald-400/10 border-emerald-400/20"
+        />
 
-            <MarketCard
-              title="Top Gainer"
-              data={topGainers}
-              showPositive
-            />
+        <MarketCard
+          title="Volume Leaders"
+          icon={<Zap size={15} className="text-blue-400" />}
+          data={topVolume}
+          badge="Highest Turn"
+          badgeColor="text-blue-300 bg-blue-400/10 border-blue-400/20"
+        />
+      </div>
 
-            <MarketCard
-              title="Top Volume"
-              data={topVolume}
-            />
-
-          </div>
-
-          {/* ============================================================
-              MAIN TABS
-          ============================================================ */}
-
-          {/* <div className="flex items-center gap-7 overflow-x-auto border-b border-[#252a33]">
-
-            {[
-              "Favorites",
-              "Cryptos",
-              "Spot",
-              "Futures",
-              "TradFi",
-              "Alpha",
-              "New",
-              "Zones",
-            ].map((tab) => (
+      <div className="rounded-2xl border border-white/[0.08] bg-[#080d16]/90 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.4)] backdrop-blur-md">
+        <div className="mb-4 flex flex-col gap-3 border-b border-white/[0.06] pb-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2">
+            {["Cryptos", "Favorites"].map((tab) => (
               <button
                 key={tab}
                 type="button"
-                onClick={() =>
-                  setActiveMainTab(tab)
-                }
-                className={`relative whitespace-nowrap pb-3 text-[16px] transition ${
+                onClick={() => setActiveMainTab(tab)}
+                className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
                   activeMainTab === tab
-                    ? "font-semibold text-white"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-cyan-500/15 text-cyan-300 shadow-sm ring-1 ring-cyan-400/30"
+                    : "text-slate-400 hover:bg-white/[0.04] hover:text-white"
                 }`}
               >
-                {tab}
-
-                {tab === "New" && (
-                  <span className="absolute -right-5 -top-2 rounded bg-yellow-400 px-1.5 text-[9px] font-bold text-black">
-                    New
+                {tab === "Favorites" && <Star size={13} className={favorites.length ? "fill-amber-400 text-amber-400" : ""} />}
+                <span>{tab}</span>
+                {tab === "Favorites" && (
+                  <span className="rounded bg-black/40 px-1.5 py-0.2 text-[10px] text-slate-400">
+                    {favorites.length}
                   </span>
-                )}
-
-                {activeMainTab === tab && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-400" />
                 )}
               </button>
             ))}
+          </div>
 
-            <div className="ml-auto hidden items-center gap-5 md:flex">
-              <Search
-                size={22}
-                className="text-slate-300"
-              />
-
-              <Bell
-                size={22}
-                className="text-slate-300"
-              />
-            </div>
-          </div> */}
-
-          {/* ============================================================
-              CATEGORY TABS
-          ============================================================ */}
-{/* 
-          <div className="flex items-center gap-7 overflow-x-auto">
-
-            {[
-              "All",
-              "bStocks",
-              "Commodities",
-              "BSC",
-              "Solana",
-              "RWA",
-              "MEME",
-              "Payments",
-              "AI",
-              "Layer 1 / Layer 2",
-              "Seed",
-              "Launchpool",
-              "Megadrop",
-              "Gaming",
-              "DeFi",
-            ].map((category) => (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+            {categories.map((category) => (
               <button
                 key={category}
                 type="button"
-                onClick={() =>
-                  setActiveCategory(
-                    category === "bStocks"
-                      ? "bStocks"
-                      : category
-                  )
-                }
-                className={`whitespace-nowrap rounded-md px-2 py-2 text-sm transition ${
+                onClick={() => setActiveCategory(category)}
+                className={`whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
                   activeCategory === category
-                    ? "bg-[#2b3442] text-white"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-300"
                 }`}
               >
                 {category}
-
-                {category === "bStocks" && (
-                  <span className="ml-1 rounded bg-yellow-500/20 px-1 text-[10px] text-yellow-300">
-                    New
-                  </span>
-                )}
               </button>
             ))}
+          </div>
+        </div>
 
-          </div> */}
-
-          {/* ============================================================
-              TABLE HEADER / DESCRIPTION
-          ============================================================ */}
-
-          {/* <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-
-            <div>
-              <h2 className="text-xl font-semibold">
-                Top Tokens by Market Capitalization
-              </h2>
-
-              <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-500">
-                Get a comprehensive snapshot of
-                cryptocurrencies available on the market.
-                Live prices and 24-hour market statistics
-                are updated through Binance WebSocket.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="flex items-center gap-1 text-sm font-medium text-white hover:text-cyan-300"
-            >
-              More
-              <ChevronDown size={15} />
-            </button>
-
-          </div> */}
-
-          {/* ============================================================
-              TABLE
-          ============================================================ */}
-
-          <div className="overflow-hidden">
-
-            {/* Table header */}
-
-            <div className="grid min-w-[1050px] grid-cols-[2.3fr_1.2fr_1.2fr_1.4fr_1.4fr_100px] items-center border-b border-[#252a33] px-0 py-4 text-xs text-slate-500">
-
+        <div className="overflow-x-auto">
+          <div className="min-w-[960px]">
+            <div className="grid grid-cols-[2.5fr_1.3fr_1.2fr_1.3fr_1.5fr_110px] items-center border-b border-white/[0.08] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <SortHeader
-                label="Name"
-                active={
-                  sortConfig.key === "name"
-                }
-                direction={
-                  sortConfig.direction
-                }
-                onClick={() =>
-                  handleSort("name")
-                }
+                label="Asset Name"
+                active={sortConfig.key === "name"}
+                direction={sortConfig.direction}
+                onClick={() => handleSort("name")}
               />
 
               <SortHeader
-                label="Price"
-                active={
-                  sortConfig.key === "price"
-                }
-                direction={
-                  sortConfig.direction
-                }
-                onClick={() =>
-                  handleSort("price")
-                }
+                label="Live Price"
+                active={sortConfig.key === "price"}
+                direction={sortConfig.direction}
+                onClick={() => handleSort("price")}
               />
 
               <SortHeader
                 label="24h Change"
-                active={
-                  sortConfig.key === "change"
-                }
-                direction={
-                  sortConfig.direction
-                }
-                onClick={() =>
-                  handleSort("change")
-                }
+                active={sortConfig.key === "change"}
+                direction={sortConfig.direction}
+                onClick={() => handleSort("change")}
               />
 
               <SortHeader
                 label="24h Volume"
-                active={
-                  sortConfig.key === "quoteVolume"
-                }
-                direction={
-                  sortConfig.direction
-                }
-                onClick={() =>
-                  handleSort("quoteVolume")
-                }
+                active={sortConfig.key === "quoteVolume"}
+                direction={sortConfig.direction}
+                onClick={() => handleSort("quoteVolume")}
               />
 
-              <div>
-                Market Cap
-              </div>
+              <div>24h Price Range (Low / High)</div>
 
-              <div className="text-right">
-                Actions
-              </div>
-
+              <div className="text-right">Action</div>
             </div>
 
-            {/* ============================================================
-                TABLE ROWS
-            ============================================================ */}
-
-            <div>
-
+            <div className="divide-y divide-white/[0.03]">
               {filteredMarkets.length === 0 && (
-                <div className="py-16 text-center text-sm text-slate-500">
-                  No market found.
+                <div className="py-16 text-center text-xs text-slate-500">
+                  No markets found matching criteria.
                 </div>
               )}
 
               {filteredMarkets.map((row) => {
+                const symbol = getSymbolName(row.symbol);
+                const isFavorite = favorites.includes(row.symbol);
+                const isPositive = row.change >= 0;
 
-                const symbol =
-                  getSymbolName(row.symbol);
-
-                const isFavorite =
-                  favorites.includes(
-                    row.symbol
-                  );
+                const rangePct =
+                  row.high > row.low && row.price >= row.low
+                    ? Math.min(100, Math.max(0, ((row.price - row.low) / (row.high - row.low)) * 100))
+                    : 50;
 
                 return (
                   <div
                     key={row.symbol}
-                    className="grid min-w-[1050px] grid-cols-[2.3fr_1.2fr_1.2fr_1.4fr_1.4fr_100px] items-center border-b border-[#20242c] py-5 transition hover:bg-[#1b1e25]"
+                    className="grid grid-cols-[2.5fr_1.3fr_1.2fr_1.3fr_1.5fr_110px] items-center px-3 py-3 text-xs transition-colors hover:bg-white/[0.03]"
                   >
-
-                    {/* Name */}
-
-                    <div className="flex items-center gap-4">
-
+                    <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() =>
-                          toggleFavorite(
-                            row.symbol
-                          )
-                        }
-                        className="text-slate-500 hover:text-yellow-300"
+                        onClick={() => toggleFavorite(row.symbol)}
+                        className="text-slate-600 transition hover:scale-110 hover:text-amber-400"
                       >
                         <Star
-                          size={18}
-                          fill={
-                            isFavorite
-                              ? "currentColor"
-                              : "none"
-                          }
-                          className={
-                            isFavorite
-                              ? "text-yellow-300"
-                              : ""
-                          }
+                          size={15}
+                          fill={isFavorite ? "#fbbf24" : "none"}
+                          className={isFavorite ? "text-amber-400" : ""}
                         />
                       </button>
 
-                      <CoinIcon
-                        symbol={symbol}
-                      />
+                      <CoinIcon symbol={symbol} />
 
-                      <div>
-                        <div className="flex items-center gap-2">
-
-                          <span className="font-semibold text-white">
-                            {symbol}
-                          </span>
-
-                          <span className="text-sm text-slate-500">
-                            {row.name}
-                          </span>
-
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-white tracking-tight">{symbol}</span>
+                          <span className="truncate text-[11px] text-slate-400">{row.name}</span>
                         </div>
-
-                        <span className="text-xs text-slate-600">
-                          {row.symbol}
+                        <span className="rounded bg-white/[0.04] px-1 py-0.2 text-[9px] font-semibold text-slate-500">
+                          {row.category}
                         </span>
                       </div>
-
                     </div>
-
-                    {/* Price */}
 
                     <div>
-                      <div className="font-medium text-white">
-                        {formatPrice(
-                          row.price
-                        )}
+                      <div className="num font-bold text-white">${formatPrice(row.price)}</div>
+                      <div className="num text-[10px] text-slate-500">Open: ${formatPrice(row.open)}</div>
+                    </div>
+
+                    <div>
+                      <span
+                        className={`num inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-bold ${
+                          isPositive
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : "bg-rose-500/10 text-rose-400"
+                        }`}
+                      >
+                        {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                        {isPositive ? "+" : ""}
+                        {formatPercent(row.change)}%
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="num font-semibold text-slate-200">${formatCompact(row.quoteVolume)}</div>
+                      <div className="num text-[10px] text-slate-500">{formatCompact(row.volume)} {symbol}</div>
+                    </div>
+
+                    <div className="pr-4">
+                      <div className="flex justify-between text-[10px] text-slate-500 num mb-1">
+                        <span>L: ${formatPrice(row.low)}</span>
+                        <span>H: ${formatPrice(row.high)}</span>
                       </div>
-
-                      <div className="mt-1 text-xs text-slate-600">
-                        ${formatPrice(row.price)}
+                      <div className="h-1.5 w-full rounded-full bg-black/50 overflow-hidden border border-white/[0.06]">
+                        <div
+                          className={`h-full rounded-full ${isPositive ? "bg-gradient-to-r from-emerald-500 to-cyan-400" : "bg-gradient-to-r from-rose-500 to-amber-500"}`}
+                          style={{ width: `${rangePct}%` }}
+                        />
                       </div>
                     </div>
 
-                    {/* Change */}
-
-                    <div
-                      className={`font-medium ${
-                        row.change >= 0
-                          ? "text-emerald-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {row.change >= 0
-                        ? "+"
-                        : ""}
-                      {formatPercent(
-                        row.change
-                      )}
-                      %
-                    </div>
-
-                    {/* Volume */}
-
-                    <div className="font-medium text-white">
-                      $
-                      {formatCompact(
-                        row.quoteVolume
-                      )}
-                    </div>
-
-                    {/* Market Cap */}
-
-                    <div className="text-slate-300">
-                      --
-                    </div>
-
-                    {/* Actions */}
-
-                    <div className="flex justify-end gap-3">
-
+                    <div className="flex justify-end gap-1.5">
                       <button
                         type="button"
-                        onClick={() =>
-                          openChart(
-                            row.symbol
-                          )
-                        }
-                        title="Open chart"
-                        className="rounded-md p-2 text-slate-300 hover:bg-[#252b35] hover:text-white"
+                        onClick={() => openChart(row.symbol)}
+                        title="Trade & Open Chart"
+                        className="btn-3d-primary flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-bold text-slate-950 shadow-sm"
                       >
-                        <BarChart3 size={18} />
+                        <BarChart3 size={13} />
+                        <span>Trade</span>
                       </button>
-
                     </div>
-
                   </div>
                 );
               })}
-
             </div>
-
           </div>
-
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  /*
-  |--------------------------------------------------------------------------
-  | Market Card
-  |--------------------------------------------------------------------------
-  */
+function MarketCard({ title, icon, data, badge, badgeColor }) {
+  const setSymbol = useChartStore((state) => state.setSymbol);
+  const navigate = useNavigate();
 
-  function MarketCard({
-    title,
-    data,
-  }) {
-    return (
-      <div className="rounded-2xl border border-[#30353f] bg-[#17191f] p-5">
-
-        <div className="mb-5 flex items-center justify-between">
-
-          <h3 className="text-sm font-semibold text-white">
-            {title}
-          </h3>
-
-          <button
-            type="button"
-            className="text-sm text-white hover:text-cyan-300"
-          >
-            More
-            <span className="ml-1">
-              ›
-            </span>
-          </button>
-
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#0c121e]/95 to-[#080d16]/95 p-4 shadow-[0_8px_20px_rgba(0,0,0,0.3)] backdrop-blur-md transition-transform duration-200 hover:-translate-y-0.5">
+      <div className="mb-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-xs font-bold uppercase tracking-wider text-white">{title}</h3>
         </div>
+        <span className={`rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${badgeColor}`}>
+          {badge}
+        </span>
+      </div>
 
-        <div className="space-y-5">
+      <div className="space-y-2.5">
+        {data.length === 0 ? (
+          <div className="text-xs text-slate-600">Syncing live stream...</div>
+        ) : (
+          data.map((coin) => {
+            const symbol = getSymbolName(coin.symbol);
+            const isPositive = coin.change >= 0;
 
-          {data.length === 0 ? (
-            <div className="text-sm text-slate-600">
-              Loading...
-            </div>
-          ) : (
-            data.map((coin) => {
+            return (
+              <button
+                key={coin.symbol}
+                type="button"
+                onClick={() => {
+                  setSymbol(coin.symbol);
+                  navigate("/dashboard");
+                }}
+                className="flex w-full items-center justify-between rounded-lg p-1.5 text-left transition hover:bg-white/[0.04]"
+              >
+                <div className="flex items-center gap-2">
+                  <CoinIcon symbol={symbol} small />
+                  <span className="text-xs font-bold text-white">{symbol}</span>
+                </div>
 
-              const symbol =
-                getSymbolName(
-                  coin.symbol
-                );
-
-              return (
-                <div
-                  key={coin.symbol}
-                  className="grid grid-cols-[1fr_auto_auto] items-center gap-4"
-                >
-
-                  <div className="flex items-center gap-3">
-
-                    <CoinIcon
-                      symbol={symbol}
-                      small
-                    />
-
-                    <span className="font-medium text-white">
-                      {symbol}
-                    </span>
-
-                  </div>
-
-                  <span className="text-sm text-slate-200">
-                    $
-                    {formatPrice(
-                      coin.price
-                    )}
-                  </span>
-
-                  <span
-                    className={`text-sm font-medium ${
-                      coin.change >= 0
-                        ? "text-emerald-400"
-                        : "text-red-400"
+                <div className="text-right">
+                  <p className="num text-xs font-bold text-slate-200">${formatPrice(coin.price)}</p>
+                  <p
+                    className={`num text-[10px] font-bold ${
+                      isPositive ? "text-emerald-400" : "text-rose-400"
                     }`}
                   >
-                    {coin.change >= 0
-                      ? "+"
-                      : ""}
-                    {formatPercent(
-                      coin.change
-                    )}
-                    %
-                  </span>
-
+                    {isPositive ? "+" : ""}
+                    {formatPercent(coin.change)}%
+                  </p>
                 </div>
-              );
-            })
-          )}
-
-        </div>
-
-      </div>
-    );
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Sort Header
-  |--------------------------------------------------------------------------
-  */
-
-  function SortHeader({
-    label,
-    active,
-    direction,
-    onClick,
-  }) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex items-center gap-1 text-left text-xs text-slate-500 hover:text-white"
-      >
-        {label}
-
-        <ArrowUpDown
-          size={13}
-          className={
-            active
-              ? "text-yellow-400"
-              : "text-slate-600"
-          }
-        />
-
-        {active && (
-          <span className="text-[9px] text-yellow-400">
-            {direction === "asc"
-              ? "▲"
-              : "▼"}
-          </span>
+              </button>
+            );
+          })
         )}
-      </button>
-    );
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Coin Icon
-  |--------------------------------------------------------------------------
-  */
-
-  function CoinIcon({
-    symbol,
-    small = false,
-  }) {
-    const firstLetter =
-      symbol?.charAt(0) || "?";
-
-    return (
-      <div
-        className={`flex shrink-0 items-center justify-center rounded-full bg-[#29303b] font-bold text-white ${
-          small
-            ? "h-7 w-7 text-xs"
-            : "h-9 w-9 text-sm"
-        }`}
-      >
-        {firstLetter}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  export default Market;
-// // import { BarChart3, Search, Star } from "lucide-react";
-// // import useChartStore from "../store/chartStore";
-// // import { useEffect, useState, useRef, useMemo } from "react";
-// // import { List } from "react-window";
+function SortHeader({ label, active, direction, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-white"
+    >
+      <span>{label}</span>
+      <ArrowUpDown size={12} className={active ? "text-cyan-400" : "text-slate-600"} />
+      {active && (
+        <span className="text-[9px] text-cyan-400">{direction === "asc" ? "▲" : "▼"}</span>
+      )}
+    </button>
+  );
+}
 
+function CoinIcon({ symbol, small = false }) {
+  const firstLetter = symbol?.charAt(0) || "?";
+  return (
+    <div
+      className={`grid shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1b253b] to-[#0f172a] font-bold text-cyan-300 border border-white/[0.08] shadow-inner ${
+        small ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs"
+      }`}
+    >
+      {firstLetter}
+    </div>
+  );
+}
 
-// // function Market() {
-// //   const setSymbol = useChartStore((state) => state.setSymbol);
-// //   const [liveData, setLiveData] = useState([]);
-  
-// //   // Use a ref to store the latest data to avoid stale closures in WebSocket
-// //   const dataRef = useRef([]);
+export default Market;
 
 // //   useEffect(() => {
 // //     const ws = new window.WebSocket('wss://stream.binance.com:9443/ws/!miniTicker@arr');

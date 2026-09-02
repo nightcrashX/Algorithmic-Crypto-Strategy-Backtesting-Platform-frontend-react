@@ -20,6 +20,12 @@ function ChartCanvas() {
   const timeframe = useChartStore((s) => s.timeframe);
   console.log("timeframe", timeframe)
 
+  const setLivePrice = useChartStore(
+    (state) => state.setLivePrice
+  );
+
+
+
   const indicators = useIndicatorStore((s) => s.indicators);
 
   const { data, isLoading } = useChart(exchange, symbol, timeframe);
@@ -264,6 +270,10 @@ function ChartCanvas() {
           // Update volume
           engineRef.current.updateVolume(liveVolume);
 
+          setLivePrice(Number(candle.close));
+          // engineRef.current.setLivePrice(close)
+
+
           console.log("📈 Live candle:", liveCandle);
           console.log("📊 Live volume:", liveVolume);
         }
@@ -364,15 +374,20 @@ function ChartCanvas() {
   ]);
 
   return (
-    // UI CHANGE: Added professional chart surface, border contrast, and polished loading overlay.
-    <div className="relative min-h-[460px] flex-1 bg-[#070b11]">
-      <div ref={containerRef} className="h-full min-h-[420px]" />
+    <div className="relative min-h-[460px] flex-1 w-full bg-[#05080e]">
+      <div ref={containerRef} className="h-full w-full min-h-[420px]" />
 
       {isLoading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#070b11]/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 rounded-md border border-[#263142] bg-[#0b1017] px-6 py-5 shadow-2xl shadow-black/40">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
-            <p className="text-sm font-medium text-slate-300">Loading market data...</p>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#05080e]/75 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-3.5 rounded-xl border border-white/[0.1] bg-[#0c121e]/95 px-7 py-6 shadow-2xl">
+            <div className="relative flex h-10 w-10 items-center justify-center">
+              <div className="absolute h-10 w-10 animate-ping rounded-full bg-cyan-400/20" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent shadow-[0_0_12px_rgba(34,211,238,0.5)]" />
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-bold uppercase tracking-wider text-white">Streaming Candles</p>
+              <p className="text-[10px] text-slate-500">Syncing orderbook & price history...</p>
+            </div>
           </div>
         </div>
       )}

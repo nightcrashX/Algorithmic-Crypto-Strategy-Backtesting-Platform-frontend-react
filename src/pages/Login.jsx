@@ -1,9 +1,8 @@
-import { CandlestickChart, LockKeyhole, Mail } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CandlestickChart, LockKeyhole, Mail, ArrowRight, ShieldCheck, Zap, TrendingUp } from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginUser } from "../services/authService";
 import useAuthStore from "../store/authStore";
-
 
 function Login() {
   const navigate = useNavigate();
@@ -15,7 +14,7 @@ function Login() {
   const handleChange = (event) => {
     setFormData((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
-  
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -27,112 +26,157 @@ function Login() {
       navigate("/market", { replace: true });
     } catch (err) {
       console.error(err);
-      setError("Unable to sign in. Check  credentials and try again.");
+      setError("Unable to sign in. Please verify your email and password.");
     } finally {
       setLoading(false);
     }
   };
-  
-  useEffect(()=>{
-    console.log("check hghghg") 
-  },[])
-   
+
   return (
-    <div className="grid min-h-screen bg-[#070a0f] text-slate-200 lg:grid-cols-[1fr_460px]">
-      <section className="hidden border-r border-[#202938] bg-[#0b1017] p-10 lg:flex lg:flex-col lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-md border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
-            <CandlestickChart size={24} />
+    <div className="grid min-h-screen bg-[#040811] text-slate-200 lg:grid-cols-[1.2fr_480px]">
+      {/* Left Showcase Side */}
+      <section className="hidden relative overflow-hidden border-r border-white/[0.08] bg-gradient-to-br from-[#0a101d] via-[#060a14] to-[#03060c] p-12 lg:flex lg:flex-col lg:justify-between">
+        {/* Ambient Glows */}
+        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
+
+        {/* Brand Header */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+            <CandlestickChart size={22} className="stroke-[2.5]" />
           </div>
           <div>
-            <p className="font-semibold text-white">AlgoTrade Terminal</p>
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Crypto strategy lab</p>
+            <div className="flex items-center gap-2">
+              <p className="font-extrabold text-white tracking-wider text-base">AlgoTrade</p>
+              <span className="rounded bg-cyan-400/20 px-1.5 py-0.2 text-[10px] font-bold text-cyan-300 border border-cyan-400/30">
+                PRO 3D
+              </span>
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Quantitative Strategy Platform</p>
           </div>
         </div>
 
-        <div className="max-w-xl">
-          <p className="mb-5 text-sm uppercase tracking-[0.28em] text-cyan-300">Professional workspace</p>
-          <h1 className="text-4xl font-semibold leading-tight text-white">
-            Monitor markets, build strategies, and validate ideas in one focused cockpit.
+        {/* Center Hero Copy */}
+        <div className="relative z-10 max-w-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-300 backdrop-blur-md mb-4">
+            <Zap size={13} className="text-cyan-400" />
+            <span>Sub-Millisecond Execution & Simulation</span>
+          </div>
+
+          <h1 className="text-4xl font-extrabold leading-tight text-white tracking-tight">
+            Institutional-Grade Crypto Strategy & Terminal Backtesting
           </h1>
+
+          <p className="mt-4 text-sm text-slate-400 leading-relaxed">
+            High-frequency Binance WebSocket streams, custom visual rule builders, and historical simulation engines designed for serious quantitative traders.
+          </p>
+
+          {/* Mini Live Ticker Cards */}
           <div className="mt-8 grid grid-cols-3 gap-3">
-            {["BTC +2.48%", "ETH +1.16%", "SOL -3.24%"].map((item) => (
-              <div key={item} className="terminal-panel rounded-md p-4">
-                <p className="num text-sm font-semibold text-white">{item}</p>
-                <p className="mt-1 text-xs text-slate-500">24h change</p>
+            {[
+              { pair: "BTCUSDT", price: "$64,280.50", change: "+2.48%", positive: true },
+              { pair: "ETHUSDT", price: "$3,450.20", change: "+1.16%", positive: true },
+              { pair: "SOLUSDT", price: "$148.90", change: "-3.24%", positive: false },
+            ].map((item) => (
+              <div
+                key={item.pair}
+                className="rounded-xl border border-white/[0.08] bg-black/40 p-3.5 backdrop-blur-md shadow-inner"
+              >
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                  <span>{item.pair}</span>
+                  <span className={`num text-[10px] ${item.positive ? "text-emerald-400" : "text-rose-400"}`}>
+                    {item.change}
+                  </span>
+                </div>
+                <p className="num mt-1 text-sm font-bold text-white">{item.price}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-xs text-slate-500">Secure paper trading environment</p>
+        {/* Footer Meta */}
+        <div className="relative z-10 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={15} className="text-cyan-400" />
+            <span>Isolated Paper Trading Environment</span>
+          </div>
+          <span>v2.4.0 High-Performance Engine</span>
+        </div>
       </section>
 
-      <section className="flex items-center justify-center p-5">
+      {/* Right Form Side */}
+      <section className="flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-[400px]">
-          <div className="mb-8 lg:hidden">
-            <CandlestickChart className="mb-3 text-cyan-300" size={32} />
-            <h1 className="text-2xl font-semibold text-white">AlgoTrade Terminal</h1>
+          {/* Mobile Brand */}
+          <div className="mb-8 lg:hidden flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-400 text-slate-950 font-bold">
+              <CandlestickChart size={20} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">AlgoTrade PRO</h1>
+              <p className="text-xs text-slate-500">Quantitative Strategy Terminal</p>
+            </div>
           </div>
 
-          <div className="terminal-panel rounded-lg p-6 shadow-2xl shadow-black/30">
+          <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#0c121e]/95 to-[#080d16]/95 p-6 shadow-[0_12px_40px_rgba(0,0,0,0.6)] backdrop-blur-md">
             <div className="mb-6">
-              <h2 className="text-xl font-semibold text-white">Sign in</h2>
-              <p className="mt-1 text-sm text-slate-500">Access  charts, watchlists, and backtests.</p>
+              <h2 className="text-xl font-extrabold tracking-tight text-white">Terminal Access</h2>
+              <p className="mt-1 text-xs text-slate-400">Sign in to your algorithmic trading cockpit.</p>
             </div>
 
             {error && (
-              <div className="mb-4 rounded-md border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-200">
+              <div className="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2.5 text-xs font-semibold text-rose-300">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <label className="block text-sm text-slate-300">
-                Email
-                <span className="mt-2 flex items-center gap-2 terminal-input px-3">
-                  <Mail size={16} className="text-slate-500" />
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email Address</label>
+                <div className="flex h-10 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-black/40 px-3 shadow-inner transition focus-within:border-cyan-400/50">
+                  <Mail size={15} className="text-slate-500" />
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    placeholder="you@example.com"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-600"
+                    placeholder="trader@algopro.io"
+                    className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-slate-600"
                   />
-                </span>
-              </label>
+                </div>
+              </div>
 
-              <label className="block text-sm text-slate-300">
-                Password
-                <span className="mt-2 flex items-center gap-2 terminal-input px-3">
-                  <LockKeyhole size={16} className="text-slate-500" />
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
+                <div className="flex h-10 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-black/40 px-3 shadow-inner transition focus-within:border-cyan-400/50">
+                  <LockKeyhole size={15} className="text-slate-500" />
                   <input
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    placeholder="••••••••"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-600"
+                    placeholder="••••••••••••"
+                    className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-slate-600"
                   />
-                </span>
-              </label>
+                </div>
+              </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="h-10 w-full rounded-md bg-cyan-400 text-sm font-semibold text-[#041014] transition hover:bg-cyan-300 disabled:opacity-60"
+                className="btn-3d-primary mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-950 shadow-lg disabled:opacity-60"
               >
-                {loading ? "Signing in..." : "Sign in"}
+                <span>{loading ? "Authenticating..." : "Sign In to Terminal"}</span>
+                <ArrowRight size={14} />
               </button>
             </form>
 
-            <p className="mt-5 text-center text-sm text-slate-500">
-              New here?{" "}
-              <Link to="/register" className="font-medium text-cyan-300 hover:text-cyan-200">
-                Create account
+            <p className="mt-5 text-center text-xs text-slate-400">
+              Need a strategy account?{" "}
+              <Link to="/register" className="font-bold text-cyan-300 hover:text-cyan-200 underline underline-offset-4">
+                Register here
               </Link>
             </p>
           </div>

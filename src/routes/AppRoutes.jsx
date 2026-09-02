@@ -8,6 +8,8 @@ import Strategy from "../pages/Strategy";
 import Market from "../pages/Market";
 import Backtesting from "../pages/Backtesting";
 import Settings from "../pages/Settings";
+// import portfolio
+import OrderHistory from "../pages/Order_History";
 
 import DashboardLayout from "../layouts/dashboardLayout";
 import AuthLayout from "../layouts/authLayout";
@@ -42,6 +44,8 @@ function AppRoutes() {
           <Route path="/strategy" element={<Strategy />} />
 
           <Route path="/Market" element={<Market />} />
+
+          <Route path="/orderhistory" element= {<OrderHistory/>}/>
 
           <Route path="/backtesting" element={<Backtesting />} />
 

@@ -8,34 +8,36 @@ function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    // UI CHANGE: Added subtle app-shell depth while preserving existing routing/layout behavior.
-    <div className="flex h-screen overflow-hidden bg-[#06090e] text-slate-200">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-[#05080e] text-slate-200">
+      {/* 3D Ambient Lighting Effect in Background */}
+      <div className="pointer-events-none absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-cyan-500/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -bottom-40 right-1/4 h-96 w-96 rounded-full bg-blue-600/10 blur-[140px]" />
 
+      {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       </div>
 
+      {/* Mobile Drawer */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm lg:hidden transition-opacity duration-200"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="h-full w-[236px]" onClick={(event) => event.stopPropagation()}>
+          <div className="h-full w-[240px] shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
           </div>
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-
+      {/* Main Viewport Shell */}
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar onMobileMenu={() => setMobileOpen(true)} />
 
-        <main className="min-h-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_30%),#070a0f] p-3 md:p-4">
+        <main className="relative min-h-0 flex-1 overflow-auto p-2.5 sm:p-4">
           <Outlet />
         </main>
-
       </div>
-
     </div>
   );
 }

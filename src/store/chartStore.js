@@ -12,6 +12,13 @@ const useChartStore = create((set) => ({
 
   exchanges: [],
   symbols: [],
+
+  livePrices: {},
+
+  setLivePrice: (price) =>
+    set({
+      livePrice: Number(price),
+    }),
   
   setExchange: (exchange) =>
     set({ exchange }),
@@ -28,6 +35,9 @@ const useChartStore = create((set) => ({
   setExchanges: (exchanges) => set({ exchanges }),
 
   setSymbols: (symbols) => set({ symbols }),
+
+  
+
 }));
 
 export default useChartStore;
