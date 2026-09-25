@@ -106,7 +106,7 @@ export class ChartEngine {
 
   // Set Candlestick Data & calculate time gap (xspan)
   setData(data) {
-    this.klines = data;
+    this.klines = data || [];
     if (data && data.length > 1) {
       // Time difference between consecutive bars
       this.xspan = data[1].time - data[0].time;
@@ -115,15 +115,94 @@ export class ChartEngine {
   }
 
   setVolume(data) {
+    this.volumes = data || [];
     this.volumeSeries.setData(data);
   }
 
+  prependCandles(olderCandles, olderVolumes) {
+    if (!olderCandles || olderCandles.length === 0) return 0;
+
+    const timeScale = this.chart.timeScale();
+    const visibleLogicalRange = timeScale.getVisibleLogicalRange();
+
+    const existingTimes = new Set((this.klines || []).map((c) => c.time));
+    const newUniqueCandles = olderCandles.filter(
+      (c) => !existingTimes.has(c.time)
+    );
+    if (newUniqueCandles.length === 0) return 0;
+
+    const mergedCandles = [...newUniqueCandles, ...(this.klines || [])].sort(
+      (a, b) => a.time - b.time
+    );
+    this.klines = mergedCandles;
+    this.candleSeries.setData(mergedCandles);
+
+    if (olderVolumes && olderVolumes.length > 0) {
+      const existingVolTimes = new Set((this.volumes || []).map((v) => v.time));
+      const newUniqueVols = olderVolumes.filter(
+        (v) => !existingVolTimes.has(v.time)
+      );
+      const mergedVols = [...newUniqueVols, ...(this.volumes || [])].sort(
+        (a, b) => a.time - b.time
+      );
+      this.volumes = mergedVols;
+      this.volumeSeries.setData(mergedVols);
+    }
+
+    const addedCount = newUniqueCandles.length;
+
+    // STEP 11: PRESERVE CHART POSITION
+    // When older backend data is prepended, preserve viewport logical range
+    if (visibleLogicalRange !== null && addedCount > 0) {
+      timeScale.setVisibleLogicalRange({
+        from: visibleLogicalRange.from + addedCount,
+        to: visibleLogicalRange.to + addedCount,
+      });
+    }
+
+    return addedCount;
+  }
+
+  subscribeVisibleLogicalRangeChange(callback) {
+    if (this.chart && this.chart.timeScale()) {
+      this.chart.timeScale().subscribeVisibleLogicalRangeChange(callback);
+    }
+  }
+
+  unsubscribeVisibleLogicalRangeChange(callback) {
+    if (this.chart && this.chart.timeScale()) {
+      this.chart.timeScale().unsubscribeVisibleLogicalRangeChange(callback);
+    }
+  }
+
   updateCandle(candle) {
+    if (this.klines && this.klines.length > 0) {
+      const lastIndex = this.klines.length - 1;
+      const lastCandle = this.klines[lastIndex];
+      if (lastCandle.time === candle.time) {
+        this.klines[lastIndex] = candle;
+      } else if (candle.time > lastCandle.time) {
+        this.klines.push(candle);
+      }
+    } else {
+      this.klines = [candle];
+    }
     this.candleSeries.update(candle);
   }
 
   updateVolume(volume) {
-    this.volumeSeries.update(volume)
+    if (this.volumes && this.volumes.length > 0) {
+      const lastIndex = this.volumes.length - 1;
+      const lastVol = this.volumes[lastIndex];
+      if (lastVol.time === volume.time) {
+        this.volumes[lastIndex] = volume;
+      } else if (volume.time > lastVol.time) {
+        this.volumes.push(volume);
+      }
+    } else {
+      this.volumes = [volume];
+    }
+    this.volumeSeries.update(volume);
   }
   // ==========================================
   // TRENDLINE INTERACTION 

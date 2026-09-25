@@ -1,7 +1,7 @@
 //chartcanvs.jsx
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChartEngine } from "./ChartEngine";
-import { useChart } from "../../hooks/useChart";
+import { fetchOHLCV } from "../../services/chartService";
 import { loadIndicator } from "../../hooks/useIndicator";
 import useChartStore from "../../store/chartStore";
 import useIndicatorStore from "../../store/indicatorStore";
@@ -24,11 +24,31 @@ function ChartCanvas() {
     (state) => state.setLivePrice
   );
 
-
-
   const indicators = useIndicatorStore((s) => s.indicators);
+  const indicatorsRef = useRef(indicators);
 
-  const { data, isLoading } = useChart(exchange, symbol, timeframe);
+  const [isLoading, setIsLoading] = useState(true);
+  const paginationRef = useRef({
+    currentPage: 1,
+    nextPage: null,
+    hasMore: true,
+    isLoading: false,
+    oldestTime: null,
+    requestedPages: new Set([1]),
+  });
+  const activeRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    indicatorsRef.current = indicators;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "subscribe_indicators",
+          indicators: indicators,
+        })
+      );
+    }
+  }, [indicators]);
 
   // Helper to extract indicator payload
   const getIndicatorPayload = useCallback((result, indicator) => {
@@ -128,6 +148,162 @@ function ChartCanvas() {
     [getHistogramData, getSeriesStyle]
   );
 
+  // Helper to load paginated historical data from backend
+  const loadHistoricalPage = useCallback(
+    async (page, toTime, isPrepend = false) => {
+      const currentRequestId = ++activeRequestIdRef.current;
+      const p = paginationRef.current;
+      p.isLoading = true;
+
+      try {
+        const res = await fetchOHLCV(
+          exchange,
+          symbol,
+          timeframe,
+          page,
+          300,
+          toTime,
+          indicatorsRef.current
+        );
+
+        // STEP 15: Discard if symbol/timeframe changed while request was in-flight
+        if (currentRequestId !== activeRequestIdRef.current) return;
+        if (!engineRef.current) return;
+
+        const candlesData = res?.candles || res?.data || [];
+        const pagination = res?.pagination || {};
+        const indicatorsData = res?.indicators || {};
+
+        if (!candlesData || candlesData.length === 0) {
+          p.hasMore = false;
+          p.isLoading = false;
+          return;
+        }
+
+        const candles = candlesData.map((c) => ({
+          time: Number(c.time),
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
+        }));
+
+        const volumes = candlesData.map((c) => ({
+          time: Number(c.time),
+          value: Number(c.volume ?? 0),
+          color:
+            Number(c.close) >= Number(c.open)
+              ? "rgba(34, 197, 94, 0.7)"
+              : "rgba(239, 68, 68, 0.7)",
+        }));
+
+        if (isPrepend) {
+          // STEP 8 & 11: Prepend older candles and preserve viewport
+          engineRef.current.prependCandles(candles, volumes);
+
+          // STEP 9 & 10: Prepend backend-calculated indicators
+          if (indicatorsData && engineRef.current.indicatorManager) {
+            const im = engineRef.current.indicatorManager;
+            const currentIndicators = indicatorsRef.current || [];
+
+            currentIndicators.forEach((ind) => {
+              const indPayload = indicatorsData[ind.id];
+              if (!indPayload) return;
+
+              if (Array.isArray(indPayload)) {
+                im.prependSingle(ind.id, indPayload);
+              } else if (typeof indPayload === "object") {
+                Object.entries(indPayload).forEach(([key, subData]) => {
+                  if (!Array.isArray(subData)) return;
+                  const seriesName = `${ind.id}-${key}`;
+                  if (key.toUpperCase().includes("HIST")) {
+                    im.prependHistogram(
+                      seriesName,
+                      getHistogramData(subData, ind)
+                    );
+                  } else {
+                    im.prependSingle(seriesName, subData);
+                  }
+                });
+              }
+            });
+          }
+        } else {
+          // STEP 4: Initial chart load
+          engineRef.current.setData(candles);
+          engineRef.current.setVolume(volumes);
+          engineRef.current.fit();
+
+          // Render initial backend indicators if available
+          if (indicatorsData && engineRef.current.indicatorManager) {
+            const currentIndicators = indicatorsRef.current || [];
+            currentIndicators.forEach((ind) => {
+              const payload = indicatorsData[ind.id];
+              if (payload) {
+                renderIndicatorPayload(ind, payload);
+              }
+            });
+          }
+        }
+
+        // STEP 6: Update backend pagination tracking
+        p.currentPage = pagination.page || page;
+        p.nextPage =
+          pagination.next_page || (pagination.has_more ? page + 1 : null);
+        p.hasMore = Boolean(pagination.has_more);
+        p.oldestTime = pagination.oldest_timestamp || candles[0].time;
+      } catch (err) {
+        console.error("Failed to load historical page:", err);
+      } finally {
+        p.isLoading = false;
+        setIsLoading(false);
+      }
+    },
+    [exchange, symbol, timeframe, getHistogramData, renderIndicatorPayload]
+  );
+
+  // STEP 14: On mount or symbol/timeframe change, reset page tracking and load Page 1
+  useEffect(() => {
+    setIsLoading(true);
+    paginationRef.current = {
+      currentPage: 1,
+      nextPage: null,
+      hasMore: true,
+      isLoading: false,
+      oldestTime: null,
+      requestedPages: new Set([1]),
+    };
+
+    loadHistoricalPage(1, null, false);
+  }, [exchange, symbol, timeframe, loadHistoricalPage]);
+
+  // STEP 5 & 7: Trigger next historical page on left scroll without duplicate requests
+  useEffect(() => {
+    if (!engineRef.current) return;
+
+    const handleRangeChange = (logicalRange) => {
+      if (!logicalRange) return;
+
+      // When visible logical range approaches the left boundary (< 50 bars)
+      if (logicalRange.from < 50) {
+        const p = paginationRef.current;
+        if (p.isLoading || !p.hasMore || !p.nextPage) return;
+        if (p.requestedPages.has(p.nextPage)) return;
+
+        p.requestedPages.add(p.nextPage);
+        loadHistoricalPage(p.nextPage, p.oldestTime, true);
+      }
+    };
+
+    engineRef.current.subscribeVisibleLogicalRangeChange(handleRangeChange);
+
+    return () => {
+      if (engineRef.current) {
+        engineRef.current.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
+      }
+    };
+  }, [loadHistoricalPage]);
+
   // 1. Initialize Chart Engine
   useEffect(() => {
     if (!containerRef.current) return;
@@ -145,35 +321,77 @@ function ChartCanvas() {
   }, []);
 
   
+  // useEffect(() => {
+  //   if (!engineRef.current) return;
+
+  //   // Close previous WebSocket
+  //   if (wsRef.current) {
+  //     wsRef.current.close();
+  //     wsRef.current = null;
+  //   }
+
+  //   // Convert HTTP protocol to WS protocol
+  //   const wsProtocol =
+  //     window.location.protocol === "https:" ? "wss:" : "ws:";
+
+  //   // Local FastAPI backend
+  //   // const wsHost =
+  //   //   import.meta.env.VITE_WS_HOST || "127.0.0.1:8000" ;
+
+  //   const wsHost = import.meta.env.VITE_WS_HOST || "algorithmic-crypto-strategy-backtesting.onrender.com";
+
+  //   // Encode symbol because symbols can contain "/"
+  //   // const encodedSymbol = encodeURIComponent(symbol);
+
+  //   // const socketUrl =
+  //   //   `${wsProtocol}//${wsHost}/live/ws/candles/` +
+  //   //   `binance/BTCUSDT/1m`;
+  //   const formatSymbol = symbol.replace("/","")
+  //   // const socketUrl =
+  //   //   `wss://socket.delta.exchange/websocket`;
+  //   const indParam =
+  //     indicatorsRef.current && indicatorsRef.current.length > 0
+  //       ? `?indicators=${encodeURIComponent(JSON.stringify(indicatorsRef.current))}`
+  //       : "";
+  //   const socketUrl =
+  //     `${wsProtocol}//${wsHost}/live/ws/candles/` +
+  //     `${exchange}/${formatSymbol}/${timeframe}${indParam}`;
+
   useEffect(() => {
-    if (!engineRef.current) return;
+  if (!engineRef.current) return;
 
-    // Close previous WebSocket
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
+  if (wsRef.current) {
+    wsRef.current.close();
+    wsRef.current = null;
+  }
 
-    // Convert HTTP protocol to WS protocol
-    const wsProtocol =
-      window.location.protocol === "https:" ? "wss:" : "ws:";
+  // ✅ FIX: Use wss:// for any non-localhost host
+  const wsHost =
+    import.meta.env.VITE_WS_HOST ||
+    "algorithmic-crypto-strategy-backtesting.onrender.com";
+  const isLocalHost =
+    wsHost.includes("localhost") || wsHost.includes("127.0.0.1");
+  const wsProtocol = isLocalHost ? "ws:" : "wss:";
 
-    // Local FastAPI backend
-    const wsHost =
-      import.meta.env.VITE_WS_HOST || "127.0.0.1:8000";
+  const formatSymbol = symbol.replace("/", "");
 
-    // Encode symbol because symbols can contain "/"
-    // const encodedSymbol = encodeURIComponent(symbol);
+  // ✅ FIX: Pass auth token as query param
+  const authToken =
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("token") ||
+    "";
+  const params = new URLSearchParams();
 
-    // const socketUrl =
-    //   `${wsProtocol}//${wsHost}/live/ws/candles/` +
-    //   `binance/BTCUSDT/1m`;
-    const formatSymbol = symbol.replace("/","")
-    // const socketUrl =
-    //   `wss://socket.delta.exchange/websocket`;
-    const socketUrl =
-      `${wsProtocol}//${wsHost}/live/ws/candles/` +
-      `${exchange}/${formatSymbol}/${timeframe}`;
+  if (authToken) params.set("token", authToken);
+  if (indicatorsRef.current && indicatorsRef.current.length > 0) {
+    params.set("indicators", JSON.stringify(indicatorsRef.current));
+  }
+
+  const query = params.toString();
+  const socketUrl =
+    `${wsProtocol}//${wsHost}/live/ws/candles/` +
+    `${exchange}/${formatSymbol}/${timeframe}` +
+    (query ? `?${query}` : "");
 
     console.log("📡 Connecting WebSocket:", socketUrl);
 
@@ -185,6 +403,14 @@ function ChartCanvas() {
       console.log(
         `✅ WebSocket connected: ${exchange}/${symbol}/${timeframe}`
       );
+      if (indicatorsRef.current && indicatorsRef.current.length > 0) {
+        ws.send(
+          JSON.stringify({
+            type: "subscribe_indicators",
+            indicators: indicatorsRef.current,
+          })
+        );
+      }
     };
 
     ws.onmessage = (event) => {
@@ -199,40 +425,43 @@ function ChartCanvas() {
         // HISTORY
         // =========================
         if (message.type === "history") {
-          const candles = message.data.map((candle) => ({
-            // Backend history timestamp is milliseconds
-            time: Math.floor(candle[0] / 1000),
+          // If chart not yet populated, set initial data; otherwise preserve existing paginated history
+          if (!engineRef.current.klines || engineRef.current.klines.length === 0) {
+            const candles = message.data.map((candle) => ({
+              // Backend history timestamp is milliseconds
+              time: Math.floor(candle[0] / 1000),
 
-            open: Number(candle[1]),
-            high: Number(candle[2]),
-            low: Number(candle[3]),
-            close: Number(candle[4]),
-          }));
+              open: Number(candle[1]),
+              high: Number(candle[2]),
+              low: Number(candle[3]),
+              close: Number(candle[4]),
+            }));
 
-          const volumes = message.data.map((candle) => ({
-            // Backend history timestamp is milliseconds
-            time: Math.floor(candle[0] / 1000),
+            const volumes = message.data.map((candle) => ({
+              // Backend history timestamp is milliseconds
+              time: Math.floor(candle[0] / 1000),
 
-            value: Number(candle[5] ?? 0),
+              value: Number(candle[5] ?? 0),
 
-            color:
-              Number(candle[4]) >= Number(candle[1])
-                ? "rgba(34, 197, 94, 0.7)"
-                : "rgba(239, 68, 68, 0.7)",
-          }));
+              color:
+                Number(candle[4]) >= Number(candle[1])
+                  ? "rgba(34, 197, 94, 0.7)"
+                  : "rgba(239, 68, 68, 0.7)",
+            }));
 
-          // Set candles through ChartEngine
-          engineRef.current.setData(candles);
+            // Set candles through ChartEngine
+            engineRef.current.setData(candles);
 
-          // Set volume through ChartEngine
-          engineRef.current.setVolume(volumes);
+            // Set volume through ChartEngine
+            engineRef.current.setVolume(volumes);
 
-          // Fit chart to data
-          engineRef.current.fit();
+            // Fit chart to data
+            engineRef.current.fit();
 
-          console.log(
-            `✅ Loaded ${candles.length} historical candles`
-          );
+            console.log(
+              `✅ Loaded ${candles.length} historical candles from WS`
+            );
+          }
 
           return;
         }
@@ -273,6 +502,68 @@ function ChartCanvas() {
           setLivePrice(Number(candle.close));
           // engineRef.current.setLivePrice(close)
 
+          // Live indicators calculated by backend
+          if (message.indicators && engineRef.current.indicatorManager) {
+            const im = engineRef.current.indicatorManager;
+
+            Object.entries(message.indicators).forEach(([indId, indVal]) => {
+              if (indVal === null || indVal === undefined) return;
+
+              // 1. Single-line indicator (EMA, SMA, RSI, ATR, VWAP, OBV, ROC, CCI, Williams %R, ADX, CMF, MFI, A/D, PSAR)
+              if (typeof indVal === "number") {
+                im.updateSingle(indId, {
+                  time: liveCandle.time,
+                  value: indVal,
+                });
+                return;
+              }
+
+              // 2. Indicator with direct .value property (e.g. Supertrend { value, trend })
+              if (
+                typeof indVal === "object" &&
+                indVal.value !== undefined &&
+                im.hasSeries(indId)
+              ) {
+                im.updateSingle(indId, {
+                  time: liveCandle.time,
+                  value: Number(indVal.value),
+                });
+                return;
+              }
+
+              // 3. Multi-output indicators (MACD, Bollinger Bands, Stochastic, Stoch RSI, Aroon, Donchian, Keltner, Ichimoku)
+              if (typeof indVal === "object") {
+                const currentIndicators = indicatorsRef.current || [];
+                const indConfig = currentIndicators.find((i) => i.id === indId);
+                const style = indConfig?.style || {};
+
+                Object.entries(indVal).forEach(([subKey, subVal]) => {
+                  if (subVal === null || subVal === undefined || isNaN(subVal)) return;
+
+                  const seriesName = `${indId}-${subKey}`;
+
+                  if (subKey.toUpperCase().includes("HIST")) {
+                    const numVal = Number(subVal);
+                    const histColor =
+                      numVal >= 0
+                        ? style.histogramUp || "#22C55E"
+                        : style.histogramDown || "#EF4444";
+
+                    im.updateHistogram(seriesName, {
+                      time: liveCandle.time,
+                      value: numVal,
+                      color: histColor,
+                    });
+                  } else {
+                    im.updateSingle(seriesName, {
+                      time: liveCandle.time,
+                      value: Number(subVal),
+                    });
+                  }
+                });
+              }
+            });
+          }
 
           console.log("📈 Live candle:", liveCandle);
           console.log("📊 Live volume:", liveVolume);

@@ -16,7 +16,6 @@ export const useFullscreen = () => {
       setError(e.message || 'Fullscreen error occurred');
     };
 
-    // Add event listeners
     const events = [
       'fullscreenchange',
       'webkitfullscreenchange',
@@ -40,8 +39,13 @@ export const useFullscreen = () => {
 
   const enterFullscreen = async () => {
     try {
-      const element = elementRef.current || document.documentElement;
+      // ONLY use elementRef.current, don't fallback to document.documentElement
+      const element = elementRef.current;
       
+      if (!element) {
+        throw new Error('No element attached to fullscreen');
+      }
+
       if (element.requestFullscreen) {
         await element.requestFullscreen();
       } else if (element.webkitRequestFullscreen) {
@@ -54,6 +58,7 @@ export const useFullscreen = () => {
     } catch (err) {
       setError(err.message);
       console.error('Error entering fullscreen:', err);
+      throw err;
     }
   };
 
@@ -71,14 +76,20 @@ export const useFullscreen = () => {
     } catch (err) {
       setError(err.message);
       console.error('Error exiting fullscreen:', err);
+      throw err;
     }
   };
 
   const toggleFullscreen = async () => {
-    if (document.fullscreenElement) {
-      await exitFullscreen();
-    } else {
-      await enterFullscreen();
+    try {
+      if (document.fullscreenElement) {
+        await exitFullscreen();
+      } else {
+        await enterFullscreen();
+      }
+    } catch (err) {
+      // Error already handled in enter/exit
+      console.error('Toggle fullscreen error:', err);
     }
   };
 

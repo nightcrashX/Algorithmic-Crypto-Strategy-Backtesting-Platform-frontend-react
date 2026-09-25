@@ -156,53 +156,6 @@ function LiveChartCanvas() {
     engineRef.current.fit();
   }, [data]);
 
-
-  // =======================================================
-  // NEW EFFECT: Initialize Live Stream API after CCXT Data Loads
-  // =======================================================
-  // useEffect(() => {
-  //   // ⚠️ GUARD: If CCXT is still loading or engine isn't ready, do not connect yet
-  //   if (!engineRef.current || isLoading) return;
-
-    // Instantiate new frontend API manager class
-  //   const streamService = new LiveStreamAPI({
-  //     exchange,
-  //     symbol,
-  //     timeframe,
-  //     onTick: (liveCandle) => {
-  //       if (engineRef.current) {
-  //         // 1. Feed live candle directly to  custom ChartEngine 
-  //         engineRef.current.updateCandle(liveCandle);
-
-  //         // 2. Construct and feed matching real-time volume bar
-  //         const liveVolume = {
-  //           time: liveCandle.time,
-  //           value: liveCandle.volume ?? 0,
-  //           color: liveCandle.close >= liveCandle.open ? "#22C55E" : "#EF4444",
-  //         };
-  //         engineRef.current.updateVolume?.(liveVolume);
-  //       }
-  //     },
-  //     onError: (err) => {
-  //       console.error("Chart Canvas stream failure:", err);
-  //     }
-  //   });
-
-  //   // Fire up the WebSocket connection pipeline
-  //   streamService.connect();
-
-  //   // CLEANUP: Automatically disconnects the API socket whenever the user updates 
-  //   // the store configurations (Exchange / Symbol / Timeframe) 
-  //   return () => {
-  //     streamService.disconnect();
-  //   };
-  // }, [exchange, symbol, timeframe, isLoading]); // Listens tightly to dynamic updates
-
-  // useEffect(()=> {
-    
-    
-  // }
-
   // 3. Load & Render Indicators from Store
   useEffect(() => {
     if (!engineRef.current) return;

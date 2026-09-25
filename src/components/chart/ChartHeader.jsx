@@ -138,16 +138,16 @@ function ChartHeader() {
 
         {/* Right Tools */}
         <div className="flex items-center gap-1.5">
-          <button
+          {/* <button
             type="button"
             title="Chart settings"
             aria-label="Chart settings"
             className="grid h-8 w-8 place-items-center rounded-lg border border-white/[0.08] bg-[#0c121e] text-slate-400 shadow-sm transition hover:border-white/20 hover:text-white"
           >
             <Settings size={15} />
-          </button>
+          </button> */}
 
-          <button
+          {/* <button
             type="button"
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
@@ -155,7 +155,7 @@ function ChartHeader() {
             onClick={toggleFullscreen}
           >
             {isFullscreen ? <Shrink size={15} /> : <Expand size={15} />}
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -192,7 +192,7 @@ function ChartHeader() {
 
       {/* Active Indicator Floating Chips */}
       {indicators.length > 0 && (
-        <div className="absolute left-3 top-[86px] z-30 flex max-w-[calc(100%-24px)] flex-wrap gap-1.5">
+        <div className="absolute left-2 top-35 z-30 flex max-w-[calc(100%-30px)] flex-wrap gap-1.5">
           {indicators.map((indicator) => (
             <div
               key={indicator.id}

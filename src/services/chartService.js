@@ -18,12 +18,20 @@ export const fetchSymbols = async (exchange) => {
 export const fetchOHLCV = async (
   exchange,
   symbol,
-  timeframe
+  timeframe,
+  page = 1,
+  limit = 300,
+  toTime = null,
+  indicators = null
 ) => {
   const res = await getOHLCV(
     exchange,
     symbol,
-    timeframe
+    timeframe,
+    page,
+    limit,
+    toTime,
+    indicators
   );
 
   return res.data;

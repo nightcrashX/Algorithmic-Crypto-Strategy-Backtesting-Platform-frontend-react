@@ -12,6 +12,7 @@ export class IndicatorManager {
     // Agar pane index store nahi karenge to MACD line, signal aur histogram alag-alag panes bana denge.
     // Iska effect ye hoga ki ek pane key ke saare outputs same pane me render honge.
     this.paneIndexes = {};
+    this.seriesData = {};
     // ===== Change End =====
   }
   
@@ -87,158 +88,122 @@ export class IndicatorManager {
   }
   // ===== Change End =====
 
-  // addSupertrend(name, data, options = {}) 
-  // {
-  //     console.log("🔥 addSupertrend called:", name);
-  //     console.log("🔥 Supertrend data:", data);
-  //     const bullName = `${name}-bull`;
-  //     const bearName = `${name}-bear`;
-  //     const bullData = [];
-  //     const bearData = [];
-  //     data.forEach((point) => {
-      
-  //         const trend = Number(point.trend);
-      
-  //         if (
-  //             point.value === null ||
-  //             point.value === undefined ||
-  //             point.value === 0
-  //         ) {
-  //             return;
-  //         }
-        
-  //         if (trend === 1) {
-          
-  //             bullData.push({
-  //                 time: point.time,
-  //                 value: point.value,
-  //             });
-            
-  //         } else if (trend === -1) {
-          
-  //             bearData.push({
-  //                 time: point.time,
-  //                 value: point.value,
-  //             });
-            
-  //         }
-        
-  //     });
-    
-  //     console.log("🟢 Bull data:", bullData);
-  //     console.log("🔴 Bear data:", bearData);
-    
-  //     // ==========================
-  //     // BULLISH SERIES
-  //     // ==========================
-    
-  //     if (!this.series[bullName]) {
-      
-  //         const bullSeries = this.engine.chart.addSeries(
-  //             LineSeries,
-  //             {
-  //                 ...this.getSeriesOptions(options),
-              
-  //                 color: "#22C55E",
-  //                 lineWidth: 2,
-              
-  //                 priceLineVisible: false,
-  //                 lastValueVisible: false,
-  //             },
-  //             this.getPaneIndex(options)
-  //         );
-        
-  //         this.series[bullName] = bullSeries;
-  //     }
-    
-  //     // ==========================
-  //     // BEARISH SERIES
-  //     // ==========================
-    
-  //     if (!this.series[bearName]) {
-      
-  //         const bearSeries = this.engine.chart.addSeries(
-  //             LineSeries,
-  //             {
-  //                 ...this.getSeriesOptions(options),
-              
-  //                 color: "#EF4444",
-  //                 lineWidth: 2,
-              
-  //                 priceLineVisible: false,
-  //                 lastValueVisible: false,
-  //             },
-  //             this.getPaneIndex(options)
-  //         );
-        
-  //         this.series[bearName] = bearSeries;
-  //     }
-    
-  //     // ==========================
-  //     // UPDATE
-  //     // ==========================
-    
-  //     this.series[bullName].setData(bullData);
-    
-  //     this.series[bearName].setData(bearData);
-    
-  // }
   addSingle(name, data, options = {}) {
+    this.seriesData[name] = Array.isArray(data) ? [...data] : [];
+
     if (this.series[name]) {
       this.series[name].setData(data);
       return;
     }
 
-  
-
-  
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki EMA/SMA/VWAP main pane me aur RSI/MACD separate pane me jana chahiye.
-    // Lightweight Charts v5 me addSeries ka third argument paneIndex hota hai, isi se real pane create hota hai.
-    // Agar ye nahi karenge to sab indicators candles ke upar same scale me aa jayenge.
     const line = this.engine.chart.addSeries(
       LineSeries,
       this.getSeriesOptions(options),
       this.getPaneIndex(options)
     );
-    // ===== Change End =====
 
     line.setData(data);
 
     this.series[name] = line;
 
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki indicator add hone ke baad panes ko TradingView jaisa resize karna hai.
-    // Iska effect ye hoga ki dynamic panes add/remove hone par chart layout automatically balance rahega.
     this.resizePanes();
-    // ===== Change End =====
   }
 
   addHistogram(name, data, options = {}) {
+    this.seriesData[name] = Array.isArray(data) ? [...data] : [];
+
     if (this.series[name]) {
       this.series[name].setData(data);
       return;
     }
 
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki histogram indicators bhi pane-aware hone chahiye.
-    // MACD histogram ya ADX type data future me alag pane me clean render ho payega.
     const histogram = this.engine.chart.addSeries(
       HistogramSeries,
       this.getSeriesOptions(options),
       this.getPaneIndex(options)
     );
-    // ===== Change End =====
 
     histogram.setData(data);
 
     this.series[name] = histogram;
 
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki histogram pane add hone ke baad remaining panes ko resize karna zaroori hai.
-    // Iska effect ye hoga ki naye pane ke baad main chart aur indicator panes balanced height me rahenge.
     this.resizePanes();
-    // ===== Change End =====
+  }
+
+  prependSingle(name, olderPoints) {
+    if (!this.series[name] || !olderPoints || olderPoints.length === 0) return;
+    const current = this.seriesData[name] || [];
+    const existingTimes = new Set(current.map((p) => p.time));
+    const newPoints = olderPoints.filter(
+      (p) => !existingTimes.has(p.time) && p.value !== null && !isNaN(p.value)
+    );
+    if (newPoints.length === 0) return;
+
+    const merged = [...newPoints, ...current].sort((a, b) => a.time - b.time);
+    this.seriesData[name] = merged;
+    this.series[name].setData(merged);
+  }
+
+  prependHistogram(name, olderPoints) {
+    if (!this.series[name] || !olderPoints || olderPoints.length === 0) return;
+    const current = this.seriesData[name] || [];
+    const existingTimes = new Set(current.map((p) => p.time));
+    const newPoints = olderPoints.filter(
+      (p) => !existingTimes.has(p.time) && p.value !== null && !isNaN(p.value)
+    );
+    if (newPoints.length === 0) return;
+
+    const merged = [...newPoints, ...current].sort((a, b) => a.time - b.time);
+    this.seriesData[name] = merged;
+    this.series[name].setData(merged);
+  }
+
+  updateSingle(name, point) {
+    if (
+      this.series[name] &&
+      point &&
+      point.time !== undefined &&
+      point.value !== null &&
+      !isNaN(point.value)
+    ) {
+      try {
+        this.series[name].update(point);
+        const current = this.seriesData[name] || [];
+        if (current.length > 0 && current[current.length - 1].time === point.time) {
+          current[current.length - 1] = point;
+        } else if (current.length === 0 || point.time > current[current.length - 1].time) {
+          current.push(point);
+        }
+      } catch (err) {
+        console.warn(`Failed to update series ${name}:`, err);
+      }
+    }
+  }
+
+  updateHistogram(name, point) {
+    if (
+      this.series[name] &&
+      point &&
+      point.time !== undefined &&
+      point.value !== null &&
+      !isNaN(point.value)
+    ) {
+      try {
+        this.series[name].update(point);
+        const current = this.seriesData[name] || [];
+        if (current.length > 0 && current[current.length - 1].time === point.time) {
+          current[current.length - 1] = point;
+        } else if (current.length === 0 || point.time > current[current.length - 1].time) {
+          current.push(point);
+        }
+      } catch (err) {
+        console.warn(`Failed to update histogram series ${name}:`, err);
+      }
+    }
+  }
+
+  hasSeries(name) {
+    return Boolean(this.series[name]);
   }
 
   remove(name) {
@@ -247,13 +212,10 @@ export class IndicatorManager {
     this.engine.chart.removeSeries(this.series[name]);
 
     delete this.series[name];
+    delete this.seriesData[name];
 
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki indicator remove hone ke baad empty pane ko hataana hai.
-    // Agar ye nahi karenge to RSI/MACD remove ke baad blank pane screen par reh sakta hai.
     this.removeEmptyPanes();
     this.resizePanes();
-    // ===== Change End =====
   }
 
   removeAll() {
@@ -262,19 +224,11 @@ export class IndicatorManager {
     });
 
     this.series = {};
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki MACD jaise multi-output indicators ko same pane reuse karna hota hai.
-    // Agar pane index store nahi karenge to MACD line, signal aur histogram alag-alag panes bana denge.
-    // Iska effect ye hoga ki ek pane key ke saare outputs same pane me render honge.
+    this.seriesData = {};
     this.paneIndexes = {};
-    // ===== Change End =====
 
-    // ===== Change Start =====
-    // Ye change isliye kiya kyuki reload ke time purane indicator panes clean hone chahiye.
-    // Iska effect ye hoga ki indicator list change hone par stale panes ya duplicate panes nahi rahenge.
     this.removeEmptyPanes();
     this.resizePanes();
-    // ===== Change End =====
   }
 }
 
